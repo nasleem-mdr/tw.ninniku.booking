@@ -94,7 +94,6 @@ public class MBooking extends X_S_Booking  implements DocAction{
 				setAssignDateFrom(assignment.getAssignDateFrom());
 				setAssignDateTo(assignment.getAssignDateTo());
 		}
-		
 		return super.beforeSave(newRecord);
 	}
 

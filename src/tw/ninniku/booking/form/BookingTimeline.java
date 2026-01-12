@@ -23,7 +23,7 @@ import org.compiere.model.Query;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.compiere.util.Trx;
-import org.zkoss.json.JSONObject;
+import org.json.JSONObject;
 import org.zkoss.zk.ui.Component;
 import org.zkoss.zk.ui.Executions;
 import org.zkoss.zk.ui.event.Event;
@@ -62,7 +62,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	private Textbox bookingDeleted;
 	private Textbox itemData;
 	private Listbox resourceType;
-    public String errorMessage ="";
+	public String errorMessage = "";
+
 	@Override
 	public void valueChange(ValueChangeEvent evt) {
 		// TODO Auto-generated method stub
@@ -92,12 +93,11 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			Gson gson = new Gson();
 			JSONObject json = gson.fromJson(itemData.getValue(), JSONObject.class);
 			Timestamp ds = new Timestamp(Long.valueOf((String) json.get("startTimestamp")));
-			Timestamp de = new Timestamp(Long.valueOf((String) json.get("endTimestamp")));	
-			
+			Timestamp de = new Timestamp(Long.valueOf((String) json.get("endTimestamp")));
+
 			int S_Booking_ID = Integer.valueOf((String) json.get("s_booking_id"));
 			int s_recource_id = Integer.valueOf((String) json.get("group"));
-			if(!updateBooking(S_Booking_ID, s_recource_id, ds, de))
-			{
+			if (!updateBooking(S_Booking_ID, s_recource_id, ds, de)) {
 				Clients.showNotification("Time overlap, update failed.");
 				renewItem(100);
 				draw(100);
@@ -111,7 +111,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			JSONObject json = gson.fromJson(itemData.getValue(), JSONObject.class);
 			if (!updateBooking(json)) {
 
-				Clients.showNotification( errorMessage);
+				Clients.showNotification(errorMessage);
 			}
 			renewItem(100);
 			draw(100);
@@ -122,23 +122,23 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			if (!deleteBooking(json)) {
 
 			}
-			
-		}	else  if(event.getTarget().getId().equals("resourceType")) {
+
+		} else if (event.getTarget().getId().equals("resourceType")) {
 			renewGroup();
 			renewItem(0);
 			String cmd = " setTimeout(function(){"
-												+ "   drawChart();},500) ;";
+					+ "   drawChart();},500) ;";
 			Clients.evalJavaScript(cmd);
 		}
-		
+
 		super.onEvent(event);
 	}
 
 	private boolean deleteBooking(JSONObject json) {
-		
-		if(!isInteger((String) json.get("id")))
+
+		if (!isInteger((String) json.get("id")))
 			return false;
-		
+
 		int id = Integer.valueOf((String) json.get("id"));
 		if (id > 0) {
 			MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id, null);
@@ -147,147 +147,147 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		}
 		return false;
 	}
+
 	public static boolean isInteger(String str) {
-	    return str.matches("-?\\d+");
+		return str.matches("-?\\d+");
 	}
+
 	private boolean updateBooking(JSONObject json) {
 
 		int id = Integer.valueOf(json.get("s_booking_id").toString());
 
-        Trx trx = Trx.get(Trx.createTrxName(), true); // Create a new transaction
-        boolean ok = false ;
-        try {
-            // Start the transaction
-            trx.start();
-            
-    		MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id, trx.getTrxName());
-    		booking.setDescription(json.get("description").toString());
-    		booking.setName(json.get("booking-name").toString());
-    		booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
-    		booking.setAssignDateFrom(new Timestamp(Long.valueOf((String) json.get("assign-date-from-timestamp"))));
-    		booking.setAssignDateTo(new Timestamp(Long.valueOf((String) json.get("assign-date-to-timestamp"))));
-            
-    		ok =booking.save(trx.getTrxName());
-    		if(!ok)
-    		{
-					errorMessage = "時間重疊:" + booking.getAssignDateFrom().toString();
-					errorMessage += " - " + booking.getAssignDateTo().toString();
+		Trx trx = Trx.get(Trx.createTrxName(), true); // Create a new transaction
+		boolean ok = false;
+		try {
+			// Start the transaction
+			trx.start();
+
+			MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id, trx.getTrxName());
+			booking.setDescription(json.get("description").toString());
+			booking.setName(json.get("booking-name").toString());
+			booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
+			booking.setAssignDateFrom(new Timestamp(Long.valueOf((String) json.get("assign-date-from-timestamp"))));
+			booking.setAssignDateTo(new Timestamp(Long.valueOf((String) json.get("assign-date-to-timestamp"))));
+
+			ok = booking.save(trx.getTrxName());
+			if (!ok) {
+				errorMessage = "時間重疊:" + booking.getAssignDateFrom().toString();
+				errorMessage += " - " + booking.getAssignDateTo().toString();
+				return ok;
+			}
+
+			if (id == 0 && json.get("is-weekly") != null) {
+				boolean isWeekly = ((String) json.get("is-weekly")).equals("Y");
+
+				if (!isWeekly)
 					return ok;
-    		}
-    			
-    		if(id == 0 && json.get("is-weekly") != null)
-    		{
-    			boolean isWeekly =  ((String) json.get("is-weekly")).equals("Y");
-    			
-    			if(!isWeekly)
-    					return ok;
-    			
-    			Timestamp repeatTo = new Timestamp(Long.valueOf((String) json.get("repeat-date-to-timestamp")));
-    	        Calendar calendarFrom = Calendar.getInstance();
-    	        Calendar calendarTo = Calendar.getInstance();
-    	        Calendar calendarEnd = Calendar.getInstance();
-    	        
-    	        calendarFrom.setTime(booking.getAssignDateFrom());
-    	        calendarFrom.add(Calendar.DAY_OF_MONTH, 7);
 
-    	        calendarTo.setTime(booking.getAssignDateTo());
-    	        calendarTo.add(Calendar.DAY_OF_MONTH, 7);
+				Timestamp repeatTo = new Timestamp(Long.valueOf((String) json.get("repeat-date-to-timestamp")));
+				Calendar calendarFrom = Calendar.getInstance();
+				Calendar calendarTo = Calendar.getInstance();
+				Calendar calendarEnd = Calendar.getInstance();
 
-    	        calendarEnd.setTime(repeatTo);
+				calendarFrom.setTime(booking.getAssignDateFrom());
+				calendarFrom.add(Calendar.DAY_OF_MONTH, 7);
 
-    			while(calendarFrom.before(calendarEnd))
-    			{
-    				
-    				booking = new MResourceAssignment(Env.getCtx(), 0, trx.getTrxName());
-    				booking.setDescription(json.get("description").toString());
-    				booking.setName(json.get("booking-name").toString());
-    				booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
-    				
-    				booking.setAssignDateFrom(new Timestamp(calendarFrom.getTimeInMillis()));
-    				booking.setAssignDateTo(new Timestamp(calendarTo.getTimeInMillis()));
-    				if(!booking.save(trx.getTrxName()))
-    				{
-    					errorMessage = "時間重疊:" + booking.getAssignDateFrom().toString();
-    					errorMessage += " - " + booking.getAssignDateTo().toString();
-    					throw new AdempiereException();
-    				}
+				calendarTo.setTime(booking.getAssignDateTo());
+				calendarTo.add(Calendar.DAY_OF_MONTH, 7);
 
-    				calendarFrom.add(Calendar.DAY_OF_MONTH, 7);
-    				calendarTo.add(Calendar.DAY_OF_MONTH, 7);
-    			}
-    			
-    		}
-    		
-    		
-    		
-            trx.commit();
-            
-            // Print a message indicating a successful commit
-            System.out.println("Transaction committed successfully.");
-        } catch (Exception e) {
-            ok = false;
-            trx.rollback();
-            
-            // Print the error message
-            System.out.println("Transaction rolled back due to an exception: " + e.getMessage());
-        } finally {
-            // Close the transaction
-            trx.close();
-            return ok;
-        }
-        
-//		
-//		MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id, null);
-//		booking.setDescription(json.get("description").toString());
-//		booking.setName(json.get("booking-name").toString());
-//		booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
-//		booking.setAssignDateFrom(new Timestamp(Long.valueOf((String) json.get("assign-date-from-timestamp"))));
-//		booking.setAssignDateTo(new Timestamp(Long.valueOf((String) json.get("assign-date-to-timestamp"))));
-//		
-//		boolean ok =booking.save();
-//		
-//		if(!ok)
-//			return ok;
-//		
-//		//repeat only for new booking
-//		if(id == 0 && json.get("is-weekly") != null)
-//		{
-//			boolean isWeekly =  ((String) json.get("is-weekly")).equals("Y");
-//			
-//			if(!isWeekly)
-//					return ok;
-//			
-//			Timestamp repeatTo = new Timestamp(Long.valueOf((String) json.get("repeat-date-to-timestamp")));
-//	        Calendar calendarFrom = Calendar.getInstance();
-//	        Calendar calendarTo = Calendar.getInstance();
-//	        Calendar calendarEnd = Calendar.getInstance();
-//	        
-//	        calendarFrom.setTime(booking.getAssignDateFrom());
-//	        calendarFrom.add(Calendar.DAY_OF_MONTH, 7);
-//
-//	        calendarTo.setTime(booking.getAssignDateTo());
-//	        calendarTo.add(Calendar.DAY_OF_MONTH, 7);
-//
-//	        calendarEnd.setTime(repeatTo);
-//
-//			while(calendarFrom.before(calendarEnd))
-//			{
-//				
-//				booking = new MResourceAssignment(Env.getCtx(), 0, null);
-//				booking.setDescription(json.get("description").toString());
-//				booking.setName(json.get("booking-name").toString());
-//				booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
-//				
-//				booking.setAssignDateFrom(new Timestamp(calendarFrom.getTimeInMillis()));
-//				booking.setAssignDateTo(new Timestamp(calendarTo.getTimeInMillis()));
-//				booking.save();
-//
-//				calendarFrom.add(Calendar.DAY_OF_MONTH, 7);
-//				calendarTo.add(Calendar.DAY_OF_MONTH, 7);
-//			}
-//			
-//		}
-//		return ok;
+				calendarEnd.setTime(repeatTo);
+
+				while (calendarFrom.before(calendarEnd)) {
+
+					booking = new MResourceAssignment(Env.getCtx(), 0, trx.getTrxName());
+					booking.setDescription(json.get("description").toString());
+					booking.setName(json.get("booking-name").toString());
+					booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
+
+					booking.setAssignDateFrom(new Timestamp(calendarFrom.getTimeInMillis()));
+					booking.setAssignDateTo(new Timestamp(calendarTo.getTimeInMillis()));
+					if (!booking.save(trx.getTrxName())) {
+						errorMessage = "時間重疊:" + booking.getAssignDateFrom().toString();
+						errorMessage += " - " + booking.getAssignDateTo().toString();
+						throw new AdempiereException();
+					}
+
+					calendarFrom.add(Calendar.DAY_OF_MONTH, 7);
+					calendarTo.add(Calendar.DAY_OF_MONTH, 7);
+				}
+
+			}
+
+			trx.commit();
+
+			// Print a message indicating a successful commit
+			System.out.println("Transaction committed successfully.");
+		} catch (Exception e) {
+			ok = false;
+			trx.rollback();
+
+			// Print the error message
+			System.out.println("Transaction rolled back due to an exception: " + e.getMessage());
+		} finally {
+			// Close the transaction
+			trx.close();
+			return ok;
+		}
+
+		//
+		// MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id,
+		// null);
+		// booking.setDescription(json.get("description").toString());
+		// booking.setName(json.get("booking-name").toString());
+		// booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
+		// booking.setAssignDateFrom(new Timestamp(Long.valueOf((String)
+		// json.get("assign-date-from-timestamp"))));
+		// booking.setAssignDateTo(new Timestamp(Long.valueOf((String)
+		// json.get("assign-date-to-timestamp"))));
+		//
+		// boolean ok =booking.save();
+		//
+		// if(!ok)
+		// return ok;
+		//
+		// //repeat only for new booking
+		// if(id == 0 && json.get("is-weekly") != null)
+		// {
+		// boolean isWeekly = ((String) json.get("is-weekly")).equals("Y");
+		//
+		// if(!isWeekly)
+		// return ok;
+		//
+		// Timestamp repeatTo = new Timestamp(Long.valueOf((String)
+		// json.get("repeat-date-to-timestamp")));
+		// Calendar calendarFrom = Calendar.getInstance();
+		// Calendar calendarTo = Calendar.getInstance();
+		// Calendar calendarEnd = Calendar.getInstance();
+		//
+		// calendarFrom.setTime(booking.getAssignDateFrom());
+		// calendarFrom.add(Calendar.DAY_OF_MONTH, 7);
+		//
+		// calendarTo.setTime(booking.getAssignDateTo());
+		// calendarTo.add(Calendar.DAY_OF_MONTH, 7);
+		//
+		// calendarEnd.setTime(repeatTo);
+		//
+		// while(calendarFrom.before(calendarEnd))
+		// {
+		//
+		// booking = new MResourceAssignment(Env.getCtx(), 0, null);
+		// booking.setDescription(json.get("description").toString());
+		// booking.setName(json.get("booking-name").toString());
+		// booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
+		//
+		// booking.setAssignDateFrom(new Timestamp(calendarFrom.getTimeInMillis()));
+		// booking.setAssignDateTo(new Timestamp(calendarTo.getTimeInMillis()));
+		// booking.save();
+		//
+		// calendarFrom.add(Calendar.DAY_OF_MONTH, 7);
+		// calendarTo.add(Calendar.DAY_OF_MONTH, 7);
+		// }
+		//
+		// }
+		// return ok;
 	}
 
 	private Timestamp convertTimestamp(String dateString) {
@@ -311,18 +311,23 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	@Override
 	protected void initForm() {
-		
-		String zul;
-		Properties p =  Env.getCtx();
-		if(p.getProperty("#Locale").equalsIgnoreCase("zh_TW"))
-			zul = "zul/meetingroom_tw.zul";
-		else
-		    zul = "zul/meetingroom.zul";
-		
-		//Component component = Executions.createComponents(ThemeManager.getThemeResource("zul/meetingroom.zul"), this, null);
 
-		Component component = Executions.createComponents(zul, this, null);
-		//getContextPath()
+		String zulPath;
+		Properties p = Env.getCtx();
+		if (p.getProperty("#Locale").equalsIgnoreCase("zh_TW"))
+			zulPath = "~./meetingroom_tw.zul";
+		else
+			zulPath = "~./meetingroom.zul";
+
+		ClassLoader cl = Thread.currentThread().getContextClassLoader();
+		Component component = null;
+		try {
+			Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
+			component = Executions.createComponents(zulPath, this, null);
+		} finally {
+			Thread.currentThread().setContextClassLoader(cl);
+		}
+		// getContextPath()
 		Button btn = (Button) component.getFellow("btnRefresh");
 		dateStart = (Textbox) component.getFellow("dateStart");
 		dateEnd = (Textbox) component.getFellow("dateEnd");
@@ -334,7 +339,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		bookingUpdated = (Textbox) component.getFellow("bookingUpdated");
 		bookingDeleted = (Textbox) component.getFellow("bookingDeleted");
 		resourceType = (Listbox) component.getFellow("resourceType");
-		// add item 
+		// add item
 		addResourceTypeItem();
 		resourceType.addEventListener(Events.ON_SELECT, this);
 		bookingUpdated.addEventListener(Events.ON_CHANGE, this);
@@ -354,20 +359,20 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		String whereSql = " AD_Client_ID= ? ";
 
 		List<MResourceType> rosueceTypes = new Query(Env.getCtx(), MResourceType.Table_Name, whereSql, null)
-				 .setParameters(new Object[] {Integer.valueOf(Env.getCtx().getProperty("#AD_Client_ID")) })
+				.setParameters(new Object[] { Integer.valueOf(Env.getCtx().getProperty("#AD_Client_ID")) })
 				.setOrderBy(MResourceType.COLUMNNAME_Name).setOnlyActiveRecords(true).list();
 
 		for (MResourceType mResourceType : rosueceTypes) {
-						Listitem newItem = new Listitem();
-						
-						newItem.setId(String.valueOf(mResourceType.getS_ResourceType_ID()));
-						newItem.setValue(String.valueOf(mResourceType.getS_ResourceType_ID()));
-						newItem.appendChild(new Listcell(mResourceType.getName()));
-						if(mResourceType.getDescription() != null && mResourceType.getDescription().contains("[default]"))
-							newItem.setSelected(true);
-						resourceType.appendChild(newItem);
+			Listitem newItem = new Listitem();
+
+			newItem.setId(String.valueOf(mResourceType.getS_ResourceType_ID()));
+			newItem.setValue(String.valueOf(mResourceType.getS_ResourceType_ID()));
+			newItem.appendChild(new Listcell(mResourceType.getName()));
+			if (mResourceType.getDescription() != null && mResourceType.getDescription().contains("[default]"))
+				newItem.setSelected(true);
+			resourceType.appendChild(newItem);
 		}
-		
+
 	}
 
 	private void renewItem(int delay) {
@@ -395,33 +400,33 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		String whereSql = " AssignDateFrom >= (now() - INTERVAL '1 day ') "
 				+ "and exists (select 1 from S_Resource where S_Resource_ID = S_ResourceAssignment.S_Resource_ID and S_ResourceType_ID = ?) ";
 		List<MResourceAssignment> bookings = new Query(Env.getCtx(), MResourceAssignment.Table_Name, whereSql, null)
-				 .setParameters(new Object[]{Integer.valueOf( (String) resourceType.getSelectedItem().getId())})
+				.setParameters(new Object[] { Integer.valueOf((String) resourceType.getSelectedItem().getId()) })
 				.setOrderBy("S_Resource_ID").setOnlyActiveRecords(true).list();
 
 		for (MResourceAssignment booking : bookings) {
-				Item item = new Item(booking.getS_ResourceAssignment_ID());
-				item.setStart((Timestamp) booking.getAssignDateFrom());
-				item.setEnd((Timestamp) booking.getAssignDateTo());
+			Item item = new Item(booking.getS_ResourceAssignment_ID());
+			item.setStart((Timestamp) booking.getAssignDateFrom());
+			item.setEnd((Timestamp) booking.getAssignDateTo());
 
-				if (isWritable || Env.getContextAsInt(Env.getCtx(), "#AD_User_ID") == booking.getCreatedBy()) {
-					item.setEditable(true);
-				} else {
-					item.setEditable(false);
-				}
+			if (isWritable || Env.getContextAsInt(Env.getCtx(), "#AD_User_ID") == booking.getCreatedBy()) {
+				item.setEditable(true);
+			} else {
+				item.setEditable(false);
+			}
 
-				/**
-				 * Resource
-				 */
-				item.setName(booking.getName());
-				item.setDescription(booking.getDescription());
-				item.setGroup(booking.getS_Resource_ID());
-				item.setContent(booking.getName());
-				MUser user = new MUser(Env.getCtx(), booking.getCreatedBy() ,null);
-				item.setContent( "(" + user.getName() + ")<br/>" + item.getContent());
-				if (booking.getDescription() != null)
-					item.setContent(item.getContent() + "<br/> " + booking.getDescription());
-				item.setTitle(item.getContent());
-				list.add(item);
+			/**
+			 * Resource
+			 */
+			item.setName(booking.getName());
+			item.setDescription(booking.getDescription());
+			item.setGroup(booking.getS_Resource_ID());
+			item.setContent(booking.getName());
+			MUser user = new MUser(Env.getCtx(), booking.getCreatedBy(), null);
+			item.setContent("(" + user.getName() + ")<br/>" + item.getContent());
+			if (booking.getDescription() != null)
+				item.setContent(item.getContent() + "<br/> " + booking.getDescription());
+			item.setTitle(item.getContent());
+			list.add(item);
 		}
 		Gson gson = new Gson();
 		return gson.toJson(list);
@@ -442,16 +447,16 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		String sql = "select * from s_resource where s_resourcetype_id = ?  ";
 		Listitem item = resourceType.getSelectedItem();
 		Gson gson = new Gson();
-		if(item == null)
+		if (item == null)
 			return gson.toJson(list);
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
 		try {
 			pstmt = DB.prepareStatement(sql, null);
-			 pstmt.setInt(1, Integer.valueOf( (String) item.getId()));
+			pstmt.setInt(1, Integer.valueOf((String) item.getId()));
 			rs = pstmt.executeQuery();
 			while (rs.next()) {
-				
+
 				String code = rs.getString("value");
 				int id = rs.getInt("s_resource_id");
 				System.out.println(id);
