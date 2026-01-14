@@ -185,6 +185,22 @@ function openEditDialog(item, callback) {
 		modal: true,
 		width: "500px",
 		buttons: {
+			"Delete": function () {
+				if (confirm("Are you sure you want to delete this booking?")) {
+					$(this).dialog("close");
+
+					// Ensure item has id for deletion
+					if (!item.id && item.s_booking_id) item.id = item.s_booking_id;
+
+					zk.$("$itemData").setValue(JSON.stringify(item));
+					zk.$("$itemData").fireOnChange();
+
+					zk.$("$bookingDeleted").setValue(Date.now().toString());
+					zk.$("$bookingDeleted").fireOnChange();
+
+					if (callback) callback(null); // Remove from timeline if present
+				}
+			},
 			Ok: function () {
 				$(this).dialog("close");
 				if (item) {
@@ -305,6 +321,7 @@ window.openCustomAddDialog = function (dateStr, minutesOffset, resourceId) {
 
 window.openCustomEditDialog = function (id, name, desc, resourceId, startMs, endMs) {
 	var item = {
+		id: id,
 		s_booking_id: id,
 		name: name,
 		content: name,
