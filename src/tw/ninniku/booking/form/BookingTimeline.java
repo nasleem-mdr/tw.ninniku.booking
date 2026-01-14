@@ -409,11 +409,15 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		ArrayList<Item> list = new ArrayList<Item>();
 
-		String whereSql = " AssignDateFrom >= (now() - INTERVAL '1 day ') "
+		String whereSql = " AssignDateFrom >= (now() - INTERVAL '2 days ') "
 				+ "and exists (select 1 from S_Resource where S_Resource_ID = S_ResourceAssignment.S_Resource_ID and S_ResourceType_ID = ?) ";
 		List<MResourceAssignment> bookings = new Query(Env.getCtx(), MResourceAssignment.Table_Name, whereSql, null)
 				.setParameters(new Object[] { Integer.valueOf((String) resourceType.getSelectedItem().getId()) })
 				.setOrderBy("S_Resource_ID").setOnlyActiveRecords(true).list();
+
+		System.out.println("Loading bookings for ResourceType=" + resourceType.getSelectedItem().getId());
+		System.out.println("Query Where: " + whereSql);
+		System.out.println("Found " + bookings.size() + " bookings.");
 
 		for (MResourceAssignment booking : bookings) {
 			Item item = new Item(booking.getS_ResourceAssignment_ID());
