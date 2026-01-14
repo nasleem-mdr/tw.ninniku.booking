@@ -4,7 +4,7 @@
           <toolbar>
             <label value="Booking"/>
             <separator bar="true"/>
-            <label value="Version 2.0"/>
+            <label value="Version ${arg.version}"/>
             <separator bar="true"/>
             <button id="btnRefresh" mold="os" label="Refresh"/>
             <separator bar="true"/>
@@ -49,7 +49,7 @@
     	<n:tr>
     		<n:td align ="right">
     			<n:label for="booking-name" width="150px">
-    				Name:
+    				會議主題:
     			</n:label>
     		</n:td>
     		<n:td>

@@ -59,66 +59,11 @@ options = {
 	},
 
 	onUpdate: function (item, callback) {
-		$(".weekly").hide();
-
-		$("#s_resource_id").val(item.group);
-		$("#s_booking_id").val(item.s_booking_id);
-		$("#group").val(item.group);
-		$("#booking-name").val(item.name);
-		$("#description").val(item.description);
-		console.log(item);
-		console.log($("#s_booking_id").val());
-		let start = new Date(item.start);
-		start.setHours(start.getHours() - (start.getTimezoneOffset() / 60));
-		let end = new Date(item.end);
-		end.setHours(end.getHours() - (end.getTimezoneOffset() / 60));
-		$("#assign-date-from").val(start.toISOString().slice(0, 16));
-		$("#assign-date-to").val(end.toISOString().slice(0, 16));
-
-		$("#update-form").dialog({
-			title: "修改預約單",
-			modal: true,
-			width: "500px",
-			buttons: {
-				Ok: function () {
-					$(this).dialog("close");
-					item.description = $("#description").val();
-					item.group = $("#group").val();
-					$("#assign-date-from-timestamp").val(toTimestamp($("#assign-date-from").val()));
-					$("#assign-date-to-timestamp").val(toTimestamp($("#assign-date-to").val()));
-					const json = convertFormToJSON($("#booking-form"));
-					/**
-					將Form 資料轉換成 json 讓後端處理
-					 */
-					if (!json.hasOwnProperty("s_booking_id") || json["s_booking_id"] === "") {
-						var val = $("#s_booking_id").val();
-						if (val === undefined || val === null) {
-							val = "0";
-						}
-						json["s_booking_id"] = val;
-					}
-					zk.$("$itemData").setValue(JSON.stringify(json));
-					zk.$("$itemData").fireOnChange();
-					zk.$("$bookingUpdated").setValue(Date.now().toString());
-					zk.$("$bookingUpdated").fireOnChange();
-
-					callback(item);
-
-				}, Cancel: function () {
-
-
-
-					$(this).dialog("close");
-					callback(null);
-
-				}
-			}
-		});
+		openEditDialog(item, callback);
 	},
 
 	onRemove: function (item, callback) {
 		//callback(null); // cancel deletion
-		console.log(item);
 		zk.$("$itemData").setValue(JSON.stringify(item));
 		zk.$("$itemData").fireOnChange();
 
@@ -135,27 +80,28 @@ function initChart() {
 	}
 
 	container = document.getElementById("booking-chart");
-	//container = $("#booking-chart");
-	timeline = new vis.Timeline(container, items, groups, options);
-	$("#loading").hide();
+	if (container) {
+		//container = $("#booking-chart");
+		timeline = new vis.Timeline(container, items, groups, options);
+		$("#loading").hide();
+
+		var today = new Date();
+
+		// Add 5 days to today's date
+		var fiveDaysLater = new Date(today);
+		fiveDaysLater.setDate(today.getDate() + 10);
+		//timeline.moveTo(new Date());
+		timeline.setWindow(today, fiveDaysLater);
+
+		//timeline.focus("1000014");
+	}
+
 	updateMeetingRoomSelector();
 	showBeforeDate();
 
 	$("#is-weekly").click(function () {
 		showBeforeDate();
 	});
-
-
-
-	var today = new Date();
-
-	// Add 5 days to today's date
-	var fiveDaysLater = new Date(today);
-	fiveDaysLater.setDate(today.getDate() + 10);
-	//timeline.moveTo(new Date());
-	timeline.setWindow(today, fiveDaysLater);
-
-	//timeline.focus("1000014");
 }
 function showBeforeDate() {
 	if ($("#is-weekly").is(':checked')) {
@@ -165,20 +111,18 @@ function showBeforeDate() {
 	}
 }
 function drawChart() {
+	if (timeline) {
+		timeline.setData({ groups: groups, items: items });
+		timeline.redraw();
 
-	timeline.setData({ groups: groups, items: items });
-	timeline.redraw();
+		var today = new Date();
 
-
-	var today = new Date();
-
-	// Add 5 days to today's date
-	var fiveDaysLater = new Date(today);
-	fiveDaysLater.setDate(today.getDate() + 10);
-	//timeline.moveTo(new Date());
-	timeline.setWindow(today, fiveDaysLater);
-
-
+		// Add 5 days to today's date
+		var fiveDaysLater = new Date(today);
+		fiveDaysLater.setDate(today.getDate() + 10);
+		//timeline.moveTo(new Date());
+		timeline.setWindow(today, fiveDaysLater);
+	}
 }
 function convertFormToJSON(form) {
 	const array = $(form).serializeArray(); // Encodes the set of form elements as an array of names and values.
@@ -195,22 +139,88 @@ function reload() {
 
 function updateMeetingRoomSelector() {
 	var select = document.getElementById("s_resource_id");
-	select.options.length = 0;
-	groups.forEach(function (element) {
+	if (select) {
+		select.options.length = 0;
+		if (groups) {
+			groups.forEach(function (element) {
 
-		var option = document.createElement("option");
-		option.value = element.id.toString();
-		option.text = element.content;
-		console.log(option);
-		select.appendChild(option);
+				var option = document.createElement("option");
+				option.value = element.id.toString();
+				option.text = element.content;
+				select.appendChild(option);
 
+			});
+		}
+	}
+}
+
+function openEditDialog(item, callback) {
+	$(".weekly").hide();
+
+	$("#s_resource_id").val(item.group);
+	$("#s_booking_id").val(item.s_booking_id);
+	$("#group").val(item.group);
+	$("#booking-name").val(item.name ? item.name : item.content); // Handle varied naming
+	$("#description").val(item.description);
+
+	let start = new Date(item.start);
+	// Handle timezone offset if not already handled
+	// start.setHours(start.getHours() - (start.getTimezoneOffset() / 60)); 
+	// Note: It seems the original code did manual offset adjustment. Keeping it consistent.
+	// However, if called from external views passed as strings/timestamp, we might need care.
+	// Assuming 'item.start' is Date object or ISO string.
+	if (!(start instanceof Date) || isNaN(start)) start = new Date(item.start);
+
+	start.setHours(start.getHours() - (start.getTimezoneOffset() / 60));
+
+	let end = new Date(item.end);
+	if (!(end instanceof Date) || isNaN(end)) end = new Date(item.end);
+	end.setHours(end.getHours() - (end.getTimezoneOffset() / 60));
+
+	$("#assign-date-from").val(start.toISOString().slice(0, 16));
+	$("#assign-date-to").val(end.toISOString().slice(0, 16));
+
+	$("#update-form").dialog({
+		title: "修改預約單",
+		modal: true,
+		width: "500px",
+		buttons: {
+			Ok: function () {
+				$(this).dialog("close");
+				if (item) {
+					item.description = $("#description").val();
+					item.group = $("#group").val();
+				}
+				$("#assign-date-from-timestamp").val(toTimestamp($("#assign-date-from").val()));
+				$("#assign-date-to-timestamp").val(toTimestamp($("#assign-date-to").val()));
+				const json = convertFormToJSON($("#booking-form"));
+				/**
+				將Form 資料轉換成 json 讓後端處理
+				 */
+				if (!json.hasOwnProperty("s_booking_id") || json["s_booking_id"] === "") {
+					var val = $("#s_booking_id").val();
+					if (val === undefined || val === null) {
+						val = "0";
+					}
+					json["s_booking_id"] = val;
+				}
+				zk.$("$itemData").setValue(JSON.stringify(json));
+				zk.$("$itemData").fireOnChange();
+				zk.$("$bookingUpdated").setValue(Date.now().toString());
+				zk.$("$bookingUpdated").fireOnChange();
+
+				if (callback) callback(item);
+
+			}, Cancel: function () {
+				$(this).dialog("close");
+				if (callback) callback(null);
+			}
+		}
 	});
 }
 
 function clickNew(item, callback) {
 
-	console.log(item);
-	console.log(callback);
 	updateMeetingRoomSelector();
 	$(".weekly").show();
 	$('#is-weekly').removeAttr('checked');
@@ -222,12 +232,15 @@ function clickNew(item, callback) {
 	start.setHours(start.getHours() - (start.getTimezoneOffset() / 60));
 	let end = new Date(item.end);
 	end.setHours(end.getHours() - (end.getTimezoneOffset() / 60));
-	$("#booking-name").val(item.content);
+
+	// Default name empty for new
+	$("#booking-name").val("");
+	$("#description").val("");
+
 	$("#assign-date-from").val(start.toISOString().slice(0, 16));
 	$("#assign-date-to").val(end.toISOString().slice(0, 16));
 	$("#s_resource_id").val(item.group);
 	$("#s_booking_id").val(0);
-	console.log(new Date(item.start).getTimezoneOffset());
 	$("#update-form").dialog({
 		title: "新增預約單",
 		modal: true,
@@ -258,17 +271,50 @@ function clickNew(item, callback) {
 				zk.$("$bookingUpdated").setValue(Date.now().toString());
 				zk.$("$bookingUpdated").fireOnChange();
 
-				callback(item);
+				if (callback) callback(item);
 			}, Cancel: function (i) {
 
 				$(this).dialog("close");
-				console.log(item);
-				callback(null);
+				if (callback) callback(null);
 			}
 		}
 	});
 }
 
+// Global functions for custom views
+window.openCustomAddDialog = function (dateStr, minutesOffset, resourceId) {
+	if (!resourceId) {
+		resourceId = (groups && groups.length > 0) ? groups[0].id : 0;
+	}
+
+	var date = new Date(dateStr);
+	// Add minutes offset to get precise start time
+	date.setMinutes(date.getMinutes() + minutesOffset);
+
+	var endDate = new Date(date);
+	endDate.setHours(endDate.getHours() + 1);
+
+	var item = {
+		start: date,
+		end: endDate,
+		group: resourceId,
+		content: ''
+	};
+	clickNew(item, null);
+};
+
+window.openCustomEditDialog = function (id, name, desc, resourceId, startMs, endMs) {
+	var item = {
+		s_booking_id: id,
+		name: name,
+		content: name,
+		description: desc,
+		group: resourceId,
+		start: new Date(startMs),
+		end: new Date(endMs)
+	};
+	openEditDialog(item, null);
+};
 
 function toTimestamp(value) {
 	const date = new Date(value);

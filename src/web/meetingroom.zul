@@ -4,12 +4,20 @@
           <toolbar>
             <label value="Booking"/>
             <separator bar="true"/>
-            <label value="Version 2.0"/>
+            <label value="Version ${arg.version}"/>
             <separator bar="true"/>
             <button id="btnRefresh" mold="os" label="Refresh"/>
             <separator bar="true"/>
             <label value="Resouce:"  class="text ui-widget-content ui-corner-all" />
             <listbox id="resourceType" mold="select"/>
+            <separator bar="true"/>
+            <button id="btnViewTimeline" label="Timeline" mold="os" disabled="true"/>
+            <button id="btnViewWeek" label="Week" mold="os"/>
+            <button id="btnViewMonth" label="Month" mold="os"/>
+            <separator bar="true"/>
+            <button id="btnPrev" label="&lt;" mold="os"/>
+            <button id="btnToday" label="Today" mold="os"/>
+            <button id="btnNext" label="&gt;" mold="os"/>
           </toolbar>
           <zscript>String uuid = java.util.UUID.randomUUID().toString(); // Generates a UUID</zscript>
   <script type="text/javascript" src="/js/vis-timeline-graph2d.min.js"></script>
@@ -26,7 +34,9 @@
 
 
 
- <n:div id="booking-chart" height="100%"></n:div>
+ <div id="bookingContainer" width="100%" height="100%">
+    <n:div id="booking-chart" height="100%"></n:div>
+ </div>
  <n:div id="loading" width="100%" class="image-container"><n:image src ="images/gg.gif"></n:image> </n:div>
 
 
@@ -49,7 +59,7 @@
     	<n:tr>
     		<n:td align ="right">
     			<n:label for="booking-name" width="150px">
-    				Name:
+    				Meeting Subject:
     			</n:label>
     		</n:td>
     		<n:td>

@@ -8,7 +8,9 @@ import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 import org.adempiere.exceptions.AdempiereException;
@@ -50,7 +52,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	 */
 	private static final long serialVersionUID = 1L;
 	private ArrayList<Group> groups;
-	String version = "1.01";
+	String version = "2.01";
 	Textbox dateStart;
 	Textbox dateEnd;
 	Textbox dateLast;
@@ -78,8 +80,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	@Override
 	public void onEvent(Event event) throws Exception {
-		System.out.println(event);
-		System.out.println(event.getTarget().getId());
 		if (event.getTarget().getId().equals("btnRefresh")) {
 			renewItem(0);
 			String cmd = " setTimeout(function(){" + "   drawChart();},500) ;";
@@ -105,11 +105,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		} else if (event.getTarget().getId().equals("bookingUpdated")) {
 			// MQTT.thread(new MQTT.TimelineProducer("TIMELINE", "RAY"), false);
 
-			Gson gson = new Gson();
-
-			String jsonData = itemData.getValue();
-			System.out.println("Received jsonData: " + jsonData);
-			JSONObject json = new JSONObject(jsonData);
+			JSONObject json = new JSONObject(itemData.getValue());
 			if (!updateBooking(json)) {
 
 				Clients.showNotification(errorMessage);
@@ -161,11 +157,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				try {
 					id = Integer.valueOf(val.toString());
 				} catch (NumberFormatException e) {
-					System.out.println("Invalid s_booking_id format: " + val);
+					// Invalid format, use 0
 				}
 			}
-		} else {
-			System.out.println("s_booking_id missing in JSON: " + json.toString());
 		}
 
 		Trx trx = Trx.get(Trx.createTrxName(), true); // Create a new transaction
@@ -231,13 +225,14 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			trx.commit();
 
 			// Print a message indicating a successful commit
-			System.out.println("Transaction committed successfully.");
+			trx.commit();
 		} catch (Exception e) {
 			ok = false;
 			trx.rollback();
 
 			// Print the error message
-			System.out.println("Transaction rolled back due to an exception: " + e.getMessage());
+			// System.out.println("Transaction rolled back due to an exception: " +
+			// e.getMessage());
 		} finally {
 			// Close the transaction
 			trx.close();
@@ -335,7 +330,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		Component component = null;
 		try {
 			Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
-			component = Executions.createComponents(zulPath, this, null);
+			Map<String, Object> args = new HashMap<String, Object>();
+			args.put("version", this.version);
+			component = Executions.createComponents(zulPath, this, args);
 		} finally {
 			Thread.currentThread().setContextClassLoader(cl);
 		}
@@ -415,10 +412,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				.setParameters(new Object[] { Integer.valueOf((String) resourceType.getSelectedItem().getId()) })
 				.setOrderBy("S_Resource_ID").setOnlyActiveRecords(true).list();
 
-		System.out.println("Loading bookings for ResourceType=" + resourceType.getSelectedItem().getId());
-		System.out.println("Query Where: " + whereSql);
-		System.out.println("Found " + bookings.size() + " bookings.");
-
 		for (MResourceAssignment booking : bookings) {
 			Item item = new Item(booking.getS_ResourceAssignment_ID());
 			item.setStart((Timestamp) booking.getAssignDateFrom());
@@ -444,8 +437,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			item.setTitle(item.getContent());
 			list.add(item);
 		}
-		Gson gson = new Gson();
-		return gson.toJson(list);
+		return new Gson().toJson(list);
 	}
 
 	private void renewGroup() {
@@ -462,9 +454,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		String sql = "select * from s_resource where s_resourcetype_id = ?  ";
 		Listitem item = resourceType.getSelectedItem();
-		Gson gson = new Gson();
 		if (item == null)
-			return gson.toJson(list);
+			return new Gson().toJson(list);
 		PreparedStatement pstmt = null;
 		ResultSet rs = null;
 		try {
@@ -475,7 +466,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 				String code = rs.getString("value");
 				int id = rs.getInt("s_resource_id");
-				System.out.println(id);
 				list.add(new Group(id, code));
 			}
 		} catch (SQLException ex) {
@@ -487,7 +477,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		}
 		groups = list;
 
-		return gson.toJson(list);
+		return new Gson().toJson(list);
 	}
 
 	private boolean isWritable() {

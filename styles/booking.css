@@ -51,15 +51,70 @@
 	background: #EEEEEE;
 }
 
+/* Enhanced Form Styles */
 fieldset {
-    border: 1px solid #c0c0c0;
-    border-radius: 0;
-    margin: 2 px;
-    padding: 5 px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    margin: 10px;
+    padding: 20px;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
 }
+
+.ui-dialog {
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+/* Better Input Fields */
+input[type="text"], 
+input[type="datetime-local"], 
+textarea,
+select {
+    padding: 8px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+    width: 90%; /* Responsive width */
+    margin-bottom: 10px;
+    transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+input[type="text"]:focus, 
+input[type="datetime-local"]:focus, 
+textarea:focus,
+select:focus {
+    border-color: #007bff;
+    outline: none;
+    box-shadow: 0 0 5px rgba(0, 123, 255, 0.25);
+}
+
+/* Label Styling */
+label {
+    font-weight: 500;
+    color: #333;
+    display: inline-block;
+    margin-bottom: 5px;
+    font-size: 14px;
+}
+
+/* Table Layout Improvements */
+td {
+    padding-bottom: 8px;
+    padding-top: 8px;
+    vertical-align: middle;
+}
+
+td[align="right"] {
+    padding-right: 15px;
+    font-weight: bold;
+    color: #555;
+    white-space: nowrap;
+}
+
 .image-container {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 100vh; /* Adjust this value according to your needs */
+  height: 100vh; 
 }
