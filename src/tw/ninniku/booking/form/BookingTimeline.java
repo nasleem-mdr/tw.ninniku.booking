@@ -90,8 +90,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			 */
 		} else if (event.getTarget().getId().equals("dateLast")) {
 
-			Gson gson = new Gson();
-			JSONObject json = gson.fromJson(itemData.getValue(), JSONObject.class);
+			JSONObject json = new JSONObject(itemData.getValue());
 			Timestamp ds = new Timestamp(Long.valueOf((String) json.get("startTimestamp")));
 			Timestamp de = new Timestamp(Long.valueOf((String) json.get("endTimestamp")));
 
@@ -108,7 +107,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 			Gson gson = new Gson();
 
-			JSONObject json = gson.fromJson(itemData.getValue(), JSONObject.class);
+			String jsonData = itemData.getValue();
+			System.out.println("Received jsonData: " + jsonData);
+			JSONObject json = new JSONObject(jsonData);
 			if (!updateBooking(json)) {
 
 				Clients.showNotification(errorMessage);
@@ -116,8 +117,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			renewItem(100);
 			draw(100);
 		} else if (event.getTarget().getId().equals("bookingDeleted")) {
-			Gson gson = new Gson();
-			JSONObject json = gson.fromJson(itemData.getValue(), JSONObject.class);
+			JSONObject json = new JSONObject(itemData.getValue());
 
 			if (!deleteBooking(json)) {
 
@@ -154,7 +154,19 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private boolean updateBooking(JSONObject json) {
 
-		int id = Integer.valueOf(json.get("s_booking_id").toString());
+		int id = 0;
+		if (json.has("s_booking_id")) {
+			Object val = json.get("s_booking_id");
+			if (val != null && !val.toString().isEmpty()) {
+				try {
+					id = Integer.valueOf(val.toString());
+				} catch (NumberFormatException e) {
+					System.out.println("Invalid s_booking_id format: " + val);
+				}
+			}
+		} else {
+			System.out.println("s_booking_id missing in JSON: " + json.toString());
+		}
 
 		Trx trx = Trx.get(Trx.createTrxName(), true); // Create a new transaction
 		boolean ok = false;
@@ -176,8 +188,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				return ok;
 			}
 
-			if (id == 0 && json.get("is-weekly") != null) {
-				boolean isWeekly = ((String) json.get("is-weekly")).equals("Y");
+			if (id == 0 && json.has("is-weekly")) {
+				boolean isWeekly = json.get("is-weekly").toString().equals("Y");
 
 				if (!isWeekly)
 					return ok;

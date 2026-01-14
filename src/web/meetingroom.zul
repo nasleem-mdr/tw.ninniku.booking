@@ -1,6 +1,16 @@
 <zk xmlns:n="native">
  <window id="HomePage" border="none" width="100%" height="100%" 
           style="background-color:green" contentStyle="overflow:auto;">
+          <toolbar>
+            <label value="Booking"/>
+            <separator bar="true"/>
+            <label value="Version 2.0"/>
+            <separator bar="true"/>
+            <button id="btnRefresh" mold="os" label="Refresh"/>
+            <separator bar="true"/>
+            <label value="Resouce:"  class="text ui-widget-content ui-corner-all" />
+            <listbox id="resourceType" mold="select"/>
+          </toolbar>
           <zscript>String uuid = java.util.UUID.randomUUID().toString(); // Generates a UUID</zscript>
   <script type="text/javascript" src="/js/vis-timeline-graph2d.min.js"></script>
   <script src="/js/jquery-ui.js"></script> 
@@ -18,10 +28,7 @@
 
  <n:div id="booking-chart" height="100%"></n:div>
  <n:div id="loading" width="100%" class="image-container"><n:image src ="images/gg.gif"></n:image> </n:div>
-  <button id="btnRefresh" mold="os" label="Refresh"/>
-  <label value="Resouce:"  class="text ui-widget-content ui-corner-all" />
-   <listbox id="resourceType" mold="select">
-  </listbox>
+
 
   <n:div id="update-form" title="預約單" style="display:none;">
   <n:form id="booking-form">
@@ -68,8 +75,8 @@
     		<n:td>
     			<n:input type="datetime-local" id="assign-date-from"
     				name="assign-date-from" value="" />
-    			<n:input type="number" name="assign-date-from-timestamp"
-    				id="assign-date-from-timestamp" value="" style="display:none;" />
+    			<n:input type="hidden" name="assign-date-from-timestamp"
+    				id="assign-date-from-timestamp" value="" />
     		</n:td>
     	</n:tr>
 
@@ -79,7 +86,7 @@
     		</n:td>
     		<n:td>
     			<n:input type="datetime-local" id="assign-date-to" name="assign-date-to" value=""/>
-        <n:input type="number" name="assign-date-to-timestamp"  id="assign-date-to-timestamp"  value ="" style="display:none;" />
+        <n:input type="hidden" name="assign-date-to-timestamp"  id="assign-date-to-timestamp"  value ="" />
     		</n:td>
     	</n:tr>
 
@@ -98,12 +105,12 @@
     		</n:td>
     		<n:td>
     		<n:input type="datetime-local" id="repeat-date-to" name="repeat-date-to" value=""/>
-        <n:input type="number" name="repeat-date-to-timestamp"  id="repeat-date-to-timestamp"  value ="" style="display:none;" />
+        <n:input type="hidden" name="repeat-date-to-timestamp"  id="repeat-date-to-timestamp"  value ="" />
     		</n:td>
     	</n:tr>
     </n:table>
     <n:br/>
-       <n:input type="number" name="s_booking_id"  id="s_booking_id"  value ="0" style="display:none;" />
+       <n:input type="hidden" name="s_booking_id"  id="s_booking_id"  value ="0" />
       <n:input type="submit" tabindex="-1" style="position:absolute; top:-1000px" />
     </n:fieldset>
   </n:form>

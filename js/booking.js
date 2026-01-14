@@ -90,6 +90,13 @@ options = {
 					/**
 					將Form 資料轉換成 json 讓後端處理
 					 */
+					if (!json.hasOwnProperty("s_booking_id") || json["s_booking_id"] === "") {
+						var val = $("#s_booking_id").val();
+						if (val === undefined || val === null) {
+							val = "0";
+						}
+						json["s_booking_id"] = val;
+					}
 					zk.$("$itemData").setValue(JSON.stringify(json));
 					zk.$("$itemData").fireOnChange();
 					zk.$("$bookingUpdated").setValue(Date.now().toString());
@@ -237,8 +244,15 @@ function clickNew(item, callback) {
 				//item.content = $("#booking-name").val();
 
 				/**
-				將Form 資料轉換成 json 讓後端處理
+				将Form 資料轉換成 json 讓後端處理
 				 */
+				if (!json.hasOwnProperty("s_booking_id") || json["s_booking_id"] === "") {
+					var val = $("#s_booking_id").val();
+					if (val === undefined || val === null) {
+						val = "0";
+					}
+					json["s_booking_id"] = val;
+				}
 				zk.$("$itemData").setValue(JSON.stringify(json));
 				zk.$("$itemData").fireOnChange();
 				zk.$("$bookingUpdated").setValue(Date.now().toString());
