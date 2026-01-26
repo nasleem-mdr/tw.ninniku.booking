@@ -54,7 +54,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private static final long serialVersionUID = 1L;
 	private ArrayList<Group> groups;
-	String version = "3.00";
+	String version = "3.01";
 	Textbox dateStart;
 	Textbox dateEnd;
 	Textbox dateLast;
@@ -70,12 +70,12 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	// View Switching
 	private Div bookingContainer;
 	private Button btnViewTimeline, btnViewWeek, btnViewMonth;
-	private Button btnPrev, btnNext, btnToday, btnRefresh;
+	private Button btnPrev, btnNext, btnToday, btnRefresh, btnAddBooking;
 
 	private static final String VIEW_TIMELINE = "TIMELINE";
 	private static final String VIEW_WEEK = "WEEK";
 	private static final String VIEW_MONTH = "MONTH";
-	private String currentViewMode = VIEW_TIMELINE;
+	private String currentViewMode = VIEW_WEEK;
 
 	private Timestamp currentViewDate; // Represents the start of the view or 'focus' date
 
@@ -96,6 +96,31 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	public void onEvent(Event event) throws Exception {
 		if (event.getTarget().getId().equals("btnRefresh")) {
 			refreshView();
+		} else if (event.getTarget() == btnAddBooking) {
+
+			// Round to nearest 00 or 30
+			Calendar cal = Calendar.getInstance();
+			cal.set(Calendar.SECOND, 0);
+			cal.set(Calendar.MILLISECOND, 0);
+			int min = cal.get(Calendar.MINUTE);
+			if (min > 30) {
+				cal.set(Calendar.MINUTE, 0);
+				cal.add(Calendar.HOUR_OF_DAY, 1);
+			} else if (min > 0) {
+				cal.set(Calendar.MINUTE, 30);
+			}
+			long startMs = cal.getTimeInMillis();
+			long endMs = startMs + 3600000; // +1 hour
+
+			String cmd = "var msg = 'Debug: '; " + "msg += 'isload=' + (typeof isload) + ', '; "
+					+ "msg += 'initChart=' + (typeof initChart) + ', '; "
+					+ "msg += 'openOld=' + (typeof window.openCustomAddDialog) + ', '; "
+					+ "msg += 'openRange=' + (typeof window.openCustomAddDialogRange); "
+					+ "console.log(msg); "
+					+ "if(window.openCustomAddDialogRange){ window.openCustomAddDialogRange("
+					+ startMs + "," + endMs
+					+ ", 0); } else { console.error('openCustomAddDialogRange missing'); alert(msg); }";
+			Clients.evalJavaScript(cmd);
 		} else if (event.getTarget() == btnViewTimeline) {
 			updateViewMode(VIEW_TIMELINE);
 		} else if (event.getTarget() == btnViewWeek) {
@@ -246,6 +271,11 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			booking.setAssignDateFrom(new Timestamp(Long.valueOf((String) json.get("assign-date-from-timestamp"))));
 			booking.setAssignDateTo(new Timestamp(Long.valueOf((String) json.get("assign-date-to-timestamp"))));
 
+			// Failsafe: Ensure Org is set
+			if (booking.getAD_Org_ID() == 0) {
+				booking.setAD_Org_ID(Env.getAD_Org_ID(Env.getCtx()));
+			}
+
 			// Validate Resource is Active/Correct? (Add logic if needed)
 
 			ok = booking.save(trx.getTrxName());
@@ -283,6 +313,11 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 					booking.setAssignDateFrom(new Timestamp(calendarFrom.getTimeInMillis()));
 					booking.setAssignDateTo(new Timestamp(calendarTo.getTimeInMillis()));
+
+					if (booking.getAD_Org_ID() == 0) {
+						booking.setAD_Org_ID(Env.getAD_Org_ID(Env.getCtx()));
+					}
+
 					if (!booking.save(trx.getTrxName())) {
 						errorMessage = "時間重疊:" + booking.getAssignDateFrom().toString();
 						errorMessage += " - " + booking.getAssignDateTo().toString();
@@ -332,12 +367,15 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	protected void initForm() {
 		currentViewDate = new Timestamp(System.currentTimeMillis());
 
-		String zulPath;
+		String zulPath = "~./meetingroom.zul";
 		Properties p = Env.getCtx();
-		if (p.getProperty("#Locale").equalsIgnoreCase("zh_TW"))
-			zulPath = "~./meetingroom_tw.zul";
-		else
-			zulPath = "~./meetingroom.zul";
+
+		Map<String, String> labels = new HashMap<>();
+		if (p.getProperty("#Locale").equalsIgnoreCase("zh_TW")) {
+			labels.put("lbSubject", "會議主題");
+		} else {
+			labels.put("lbSubject", "Meeting Subject:");
+		}
 
 		ClassLoader cl = Thread.currentThread().getContextClassLoader();
 		Component component = null;
@@ -345,14 +383,18 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			Thread.currentThread().setContextClassLoader(getClass().getClassLoader());
 			Map<String, Object> args = new HashMap<String, Object>();
 			args.put("version", this.version);
+			args.put("labels", labels);
 			component = Executions.createComponents(zulPath, this, args);
 		} finally {
 			Thread.currentThread().setContextClassLoader(cl);
 		}
 		// getContextPath()
 		btnRefresh = (Button) component.getFellow("btnRefresh");
+		btnAddBooking = (Button) component.getFellow("btnAddBooking");
 		btnViewTimeline = (Button) component.getFellow("btnViewTimeline");
+		btnViewTimeline.setDisabled(false);
 		btnViewWeek = (Button) component.getFellow("btnViewWeek");
+		btnViewWeek.setDisabled(true);
 		btnViewMonth = (Button) component.getFellow("btnViewMonth");
 		btnPrev = (Button) component.getFellow("btnPrev");
 		btnNext = (Button) component.getFellow("btnNext");
@@ -376,6 +418,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		bookingUpdated.addEventListener(Events.ON_CHANGE, this);
 		bookingDeleted.addEventListener(Events.ON_CHANGE, this);
 		btnRefresh.addEventListener(Events.ON_CLICK, this);
+		btnAddBooking.addEventListener(Events.ON_CLICK, this);
 
 		btnViewTimeline.addEventListener(Events.ON_CLICK, this);
 		btnViewWeek.addEventListener(Events.ON_CLICK, this);
@@ -387,9 +430,13 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		renewGroup();
 
 		// Default load
-		renewItem(500);
-		String cmd = "setTimeout(function(){" + "initChart();" + " }, 2000)";
-		Clients.evalJavaScript(cmd);
+		if (VIEW_TIMELINE.equals(currentViewMode)) {
+			renewItem(500);
+			String cmd = "setTimeout(function(){" + "initChart();" + " }, 2000)";
+			Clients.evalJavaScript(cmd);
+		} else {
+			refreshView();
+		}
 	}
 
 	private void addResourceTypeItem() {
@@ -633,8 +680,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		for (String dayKey : dayKeys) {
 			String defaultResId = (groups != null && groups.size() > 0 ? groups.get(0).getId().toString() : ""); // Ensure
 																													// string
-			html.append("<div class='day-col' onclick=\"onWeekDayClick(event, this, '" + dayKey + "', '" + defaultResId
-					+ "');\">");
+			html.append("<div class='day-col' data-date='" + dayKey + "' data-resource-id='" + defaultResId + "'>");
 
 			// 1. Filter events for this day
 			List<MResourceAssignment> dayEvents = new ArrayList<>();
@@ -747,23 +793,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		// Auto scroll to 8am
 		// Script for Week View Logic
 		html.append("<script>");
-		html.append("window.onWeekDayClick = function(event, elem, dayKey, resourceId) {");
-		html.append("  var rect = elem.getBoundingClientRect();");
-		html.append("  var min = (event.clientY - rect.top) / 40 * 60;");
-		html.append("  if (window.openCustomAddDialog) {");
-		html.append("    window.openCustomAddDialog(dayKey, min, resourceId);");
-		html.append("  }");
-		html.append("};");
-		html.append("window.onWeekEventClick = function(event, id, name, desc, resId, startMs, endMs) {");
-		html.append("  event.stopPropagation();");
-		html.append("  if (window.openCustomEditDialog) {");
-		html.append("    window.openCustomEditDialog(id, name, desc, resId, startMs, endMs);");
-		html.append("  }");
-		html.append("};");
-		html.append("setTimeout(function(){");
-		html.append("  var el = document.querySelector('.scroll-body');");
-		html.append("  if(el) el.scrollTop = 320;");
-		html.append("}, 200);");
+		html.append("if (window.weekViewScrollTo8Am) { window.weekViewScrollTo8Am(); }");
 		html.append("</script>");
 
 		Html zkHtml = new Html();

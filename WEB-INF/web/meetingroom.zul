@@ -11,6 +11,8 @@
             <label value="Resouce:"  class="text ui-widget-content ui-corner-all" />
             <listbox id="resourceType" mold="select"/>
             <separator bar="true"/>
+            <button id="btnAddBooking" label="Add Booking" mold="os" style="background-color: #1976D2; color: black; font-weight: bold; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);" />
+            <separator bar="true"/>
             <button id="btnViewTimeline" label="Timeline" mold="os" disabled="true"/>
             <button id="btnViewWeek" label="Week" mold="os"/>
             <button id="btnViewMonth" label="Month" mold="os"/>
@@ -29,7 +31,62 @@
     <style src="/styles/jquery.toast.css"/> 
     <style src="/styles/booking.css"/> 
   <style></style>
-<n:script xmlns:n="native"></n:script>
+<n:script xmlns:n="native">
+<![CDATA[
+// Fallback: Define global functions here in case booking.js is cached/stale
+window.openCustomAddDialog = function (dateStr, minutesOffset, resourceId) {
+	if (!resourceId) {
+		resourceId = (groups && groups.length > 0) ? groups[0].id : 0;
+	}
+	var date = new Date(dateStr);
+	date.setMinutes(date.getMinutes() + minutesOffset);
+	var endDate = new Date(date);
+	endDate.setHours(endDate.getHours() + 1);
+	var item = { start: date, end: endDate, group: resourceId, content: '' };
+	if(typeof clickNew === 'function') clickNew(item, function(){});
+    else console.error("clickNew not defined");
+};
+
+window.openCustomEditDialog = function (id, name, desc, resourceId, startMs, endMs) {
+	var item = {
+		id: id, s_booking_id: id, name: name, content: name, description: desc,
+		group: resourceId, start: new Date(startMs), end: new Date(endMs)
+	};
+	if(typeof openEditDialog === 'function') openEditDialog(item, function(){});
+};
+
+window.openCustomAddDialogRange = function (startMs, endMs, resourceId) {
+	if (!resourceId) {
+		resourceId = (groups && groups.length > 0) ? groups[0].id : 0;
+	}
+	var start = new Date(startMs);
+	var end = new Date(endMs);
+	var item = { start: start, end: end, group: resourceId, content: '' };
+	if(typeof clickNew === 'function') clickNew(item, function(){});
+    else console.error("clickNew not defined");
+};
+
+var _weekViewWasDragging = false;
+window.onWeekDayClick = function (event, elem, dayKey, resourceId) {
+	if (_weekViewWasDragging) { _weekViewWasDragging = false; return; }
+	var rect = elem.getBoundingClientRect();
+	var min = (event.clientY - rect.top) / 40 * 60;
+	if (window.openCustomAddDialog) window.openCustomAddDialog(dayKey, min, resourceId);
+};
+
+window.onWeekEventClick = function (event, id, name, desc, resId, startMs, endMs) {
+	event.stopPropagation();
+	if (window.openCustomEditDialog) window.openCustomEditDialog(id, name, desc, resId, startMs, endMs);
+};
+
+window.weekViewScrollTo8Am = function () {
+	setTimeout(function () {
+		var el = document.querySelector('.scroll-body');
+		if (el) el.scrollTop = 320;
+	}, 200);
+};
+]]>
+</n:script>
 
 
 
@@ -59,7 +116,7 @@
     	<n:tr>
     		<n:td align ="right">
     			<n:label for="booking-name" width="150px">
-    				Meeting Subject:
+    				${arg.labels.lbSubject}
     			</n:label>
     		</n:td>
     		<n:td>
