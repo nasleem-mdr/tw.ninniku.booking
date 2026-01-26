@@ -93,7 +93,8 @@ window.weekViewScrollTo8Am = function () {
 	function getTimeFromY(y, dayKey) {
 		// 40px = 60 mins -> 1px = 1.5 mins
 		var mins = (y / 40) * 60;
-		var date = new Date(dayKey);
+		// Force local time parsing
+		var date = new Date(dayKey + 'T00:00:00');
 		date.setMinutes(date.getMinutes() + mins);
 		return date;
 	}
