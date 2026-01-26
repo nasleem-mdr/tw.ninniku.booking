@@ -85,6 +85,141 @@ window.weekViewScrollTo8Am = function () {
 		if (el) el.scrollTop = 320;
 	}, 200);
 };
+
+// --- Drag and Drop Logic (Inline Fallback) ---
+(function () {
+    var $ = window.$ || window.jQuery || window.jq;
+	// Helper to get time from Y coordinate relative to day-col
+	function getTimeFromY(y, dayKey) {
+		// 40px = 60 mins -> 1px = 1.5 mins
+		var mins = (y / 40) * 60;
+		var date = new Date(dayKey);
+		date.setMinutes(date.getMinutes() + mins);
+		return date;
+	}
+
+	var dragStartData = null;
+	var dragGhost = null;
+	var isDragging = false;
+
+	function initDragEvents() {
+        $ = window.$ || window.jQuery || window.jq;
+		if (typeof $ === 'undefined') {
+			setTimeout(initDragEvents, 100);
+			return;
+		}
+
+		// Unbind first to avoid duplicates
+		$(document).off('mousedown', '.day-col');
+		$(document).off('mousemove.weekview');
+		$(document).off('mouseup.weekview');
+
+		$(document).on('mousedown', '.day-col', function (e) {
+			if ($(e.target).closest('.event-card').length > 0) return;
+			e.preventDefault();
+
+			var col = $(this);
+			var rect = this.getBoundingClientRect();
+			var offsetY = e.clientY - rect.top;
+
+			var dayKey = col.data('date') || col.attr('data-date');
+			var resId = col.data('resource-id') || col.attr('data-resource-id');
+
+			if (!dayKey) return;
+
+			dragStartData = {
+				col: col,
+				startY: offsetY,
+				dayKey: dayKey,
+				resId: resId
+			};
+			isDragging = false;
+            _weekViewWasDragging = false;
+		});
+
+		$(document).on('mousemove.weekview', function (e) {
+			if (!dragStartData) return;
+
+			var col = dragStartData.col;
+			var rect = col[0].getBoundingClientRect();
+			var currentY = e.clientY - rect.top;
+
+			if (!isDragging && Math.abs(currentY - dragStartData.startY) > 5) {
+				isDragging = true;
+				// Create Ghost
+				if($('.drag-ghost').length === 0) {
+    				dragGhost = $('<div class="drag-ghost"></div>');
+    				col.append(dragGhost);
+                } else {
+                    dragGhost = $('.drag-ghost');
+                }
+			}
+
+			if (isDragging) {
+				var top = Math.min(dragStartData.startY, currentY);
+				var height = Math.abs(currentY - dragStartData.startY);
+				dragGhost.css({
+					top: top + 'px',
+					height: height + 'px'
+				});
+			}
+		});
+
+		$(document).on('mouseup.weekview', function (e) {
+			if (!dragStartData) return;
+
+			if (isDragging) {
+				var col = dragStartData.col;
+				var rect = col[0].getBoundingClientRect();
+				var currentY = e.clientY - rect.top;
+
+				var startY = Math.min(dragStartData.startY, currentY);
+				var endY = Math.max(dragStartData.startY, currentY);
+                
+                // Minimum height check (e.g. 15 mins = 10px)
+                if (endY - startY < 10) endY = startY + 10;
+
+				var start = getTimeFromY(startY, dragStartData.dayKey);
+				var end = getTimeFromY(endY, dragStartData.dayKey);
+
+                // Round to nearest 30 minutes
+                function snapTo30(d) {
+                    var m = d.getMinutes();
+                    var r = Math.round(m / 30) * 30;
+                    d.setMinutes(r, 0, 0);
+                    return d;
+                }
+                
+                start = snapTo30(start);
+                end = snapTo30(end);
+                
+                // Ensure valid duration (min 30 min)
+                if (end.getTime() <= start.getTime()) {
+                    end = new Date(start.getTime() + 30 * 60000);
+                }
+
+				if (window.openCustomAddDialogRange) {
+					window.openCustomAddDialogRange(start.getTime(), end.getTime(), dragStartData.resId);
+				}
+				
+				$('.drag-ghost').remove();
+                dragGhost = null;
+                _weekViewWasDragging = true; // Prevent click event from firing
+			} 
+            // If not dragging, the existing onclick handler on the div might trigger?
+            // actually we are preventing default on mousedown, so click might not fire reliably?
+            // But we have `onWeekDayClick` which is inline `onclick`... 
+            // Let's rely on standard onclick if no drag.
+            
+			dragStartData = null;
+			isDragging = false;
+            setTimeout(function(){ _weekViewWasDragging = false; }, 100);
+		});
+	}
+
+	// Start initialization
+	initDragEvents();
+})();
 ]]>
 </n:script>
 

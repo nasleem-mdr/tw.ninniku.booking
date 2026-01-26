@@ -54,7 +54,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private static final long serialVersionUID = 1L;
 	private ArrayList<Group> groups;
-	String version = "3.01";
+	String version = "3.02";
 	Textbox dateStart;
 	Textbox dateEnd;
 	Textbox dateLast;
@@ -645,6 +645,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				".day-col { flex: 1; border-right: 1px solid #eee; position: relative; height: 960px; background: repeating-linear-gradient(to bottom, transparent 0, transparent 39px, #f5f5f5 40px); cursor: pointer; }");
 		html.append(
 				".event-card { position: absolute; font-size: 11px; color: white; border-radius: 3px; padding: 2px 4px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.2); z-index: 10; cursor: pointer; }");
+		html.append(
+				".drag-ghost { position: absolute; background: rgba(33, 150, 243, 0.6); border: 2px solid #1565C0; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 100; pointer-events: none; }");
 		html.append("</style>");
 
 		html.append("<div class='week-view-root'>");
