@@ -66,17 +66,17 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	private Textbox bookingDeleted;
 	private Textbox itemData;
 	private Listbox resourceType;
-	
+
 	// View Switching
 	private Div bookingContainer;
 	private Button btnViewTimeline, btnViewWeek, btnViewMonth;
 	private Button btnPrev, btnNext, btnToday, btnRefresh;
-	
+
 	private static final String VIEW_TIMELINE = "TIMELINE";
 	private static final String VIEW_WEEK = "WEEK";
 	private static final String VIEW_MONTH = "MONTH";
 	private String currentViewMode = VIEW_TIMELINE;
-	
+
 	private Timestamp currentViewDate; // Represents the start of the view or 'focus' date
 
 	public String errorMessage = "";
@@ -153,11 +153,11 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		btnViewMonth.setDisabled(mode.equals(VIEW_MONTH));
 		refreshView();
 	}
-	
+
 	private void navigateView(int direction) {
 		Calendar cal = Calendar.getInstance();
 		cal.setTime(currentViewDate);
-		
+
 		if (VIEW_WEEK.equals(currentViewMode)) {
 			cal.add(Calendar.WEEK_OF_YEAR, direction);
 		} else if (VIEW_MONTH.equals(currentViewMode)) {
@@ -169,25 +169,27 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		currentViewDate = new Timestamp(cal.getTimeInMillis());
 		refreshView();
 	}
-	
+
 	private void refreshView() {
 		bookingContainer.getChildren().clear();
-		
+
 		if (VIEW_TIMELINE.equals(currentViewMode)) {
 			// Restore Timeline container
 			// <n:div id="booking-chart" height="100%"></n:div>
-			// org.zkoss.zhtml.Div div = new org.zkoss.zhtml.Div(); // zhtml.Div corresponds to n:div logic generally or just Div
-			// Actually existing code used <n:div xmlns:n="native"> which maps to org.zkoss.zhtml.Div or similar if configured, 
+			// org.zkoss.zhtml.Div div = new org.zkoss.zhtml.Div(); // zhtml.Div corresponds
+			// to n:div logic generally or just Div
+			// Actually existing code used <n:div xmlns:n="native"> which maps to
+			// org.zkoss.zhtml.Div or similar if configured,
 			// but here let's just use ZK Div but with the ID expected by existing JS
-			
-			// Warning: ZK ID collision if we reuse "booking-chart". 
+
+			// Warning: ZK ID collision if we reuse "booking-chart".
 			// But we cleared children.
 			// Ideally we want to output <div id="booking-chart">...</div>
 			Html html = new Html("<div id='booking-chart' style='height:100%'></div>");
 			html.setHflex("1");
 			html.setVflex("1");
 			bookingContainer.appendChild(html);
-			
+
 			renewItem(100);
 			// Re-initialize chart because the DOM element was recreated
 			String cmd = "setTimeout(function(){ initChart(); }, 200);";
@@ -243,7 +245,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
 			booking.setAssignDateFrom(new Timestamp(Long.valueOf((String) json.get("assign-date-from-timestamp"))));
 			booking.setAssignDateTo(new Timestamp(Long.valueOf((String) json.get("assign-date-to-timestamp"))));
-			
+
 			// Validate Resource is Active/Correct? (Add logic if needed)
 
 			ok = booking.save(trx.getTrxName());
@@ -355,9 +357,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		btnPrev = (Button) component.getFellow("btnPrev");
 		btnNext = (Button) component.getFellow("btnNext");
 		btnToday = (Button) component.getFellow("btnToday");
-		
+
 		bookingContainer = (Div) component.getFellow("bookingContainer");
-		
+
 		dateStart = (Textbox) component.getFellow("dateStart");
 		dateEnd = (Textbox) component.getFellow("dateEnd");
 		dateLast = (Textbox) component.getFellow("dateLast");
@@ -374,7 +376,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		bookingUpdated.addEventListener(Events.ON_CHANGE, this);
 		bookingDeleted.addEventListener(Events.ON_CHANGE, this);
 		btnRefresh.addEventListener(Events.ON_CLICK, this);
-		
+
 		btnViewTimeline.addEventListener(Events.ON_CLICK, this);
 		btnViewWeek.addEventListener(Events.ON_CLICK, this);
 		btnViewMonth.addEventListener(Events.ON_CLICK, this);
@@ -383,7 +385,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		btnToday.addEventListener(Events.ON_CLICK, this);
 
 		renewGroup();
-		
+
 		// Default load
 		renewItem(500);
 		String cmd = "setTimeout(function(){" + "initChart();" + " }, 2000)";
@@ -414,11 +416,13 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private void renewItem(int delay) {
 		String itemJson = getBookingJSON();
-		
-		// If custom views, we don't send to vis.js but we might reuse getBookingJSON logic?
-		// getBookingJSON() queries 'now() - 2 days' which is hardcoded. 
-		// We should probably respect currentViewDate if possible, or leave Timeline as is.
-		
+
+		// If custom views, we don't send to vis.js but we might reuse getBookingJSON
+		// logic?
+		// getBookingJSON() queries 'now() - 2 days' which is hardcoded.
+		// We should probably respect currentViewDate if possible, or leave Timeline as
+		// is.
+
 		String cmd = "items = new vis.DataSet(" + itemJson + ");";
 		cmd = " setTimeout(function(){" + cmd + "}," + delay + ");";
 		// cmd = " jq(document).ready(function () {" +cmd+ " });";
@@ -438,13 +442,14 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		boolean isWritable = isWritable();
 
 		ArrayList<Item> list = new ArrayList<Item>();
-		
+
 		// Original logic queries >= val
 		// String whereSql = " AssignDateFrom >= (now() - INTERVAL '2 days ') "
-		// 		+ "and exists (select 1 from S_Resource where S_Resource_ID = S_ResourceAssignment.S_Resource_ID and S_ResourceType_ID = ?) ";
-		
+		// + "and exists (select 1 from S_Resource where S_Resource_ID =
+		// S_ResourceAssignment.S_Resource_ID and S_ResourceType_ID = ?) ";
+
 		// We should keep this for Timeline View as it was.
-		
+
 		String whereSql = " AssignDateFrom >= (now() - INTERVAL '2 days ') "
 				+ "and exists (select 1 from S_Resource where S_Resource_ID = S_ResourceAssignment.S_Resource_ID and S_ResourceType_ID = ?) ";
 
@@ -476,14 +481,15 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		}
 		return new Gson().toJson(list);
 	}
-	
+
 	// Helper for custom views query
 	private List<MResourceAssignment> fetchBookings(Timestamp start, Timestamp end) {
 		String whereSql = " AssignDateFrom >= ? AND AssignDateFrom <= ? "
 				+ "and exists (select 1 from S_Resource where S_Resource_ID = S_ResourceAssignment.S_Resource_ID and S_ResourceType_ID = ?) ";
-				
+
 		return new Query(Env.getCtx(), MResourceAssignment.Table_Name, whereSql, null)
-				.setParameters(new Object[] { start, end, Integer.valueOf((String) resourceType.getSelectedItem().getId()) })
+				.setParameters(
+						new Object[] { start, end, Integer.valueOf((String) resourceType.getSelectedItem().getId()) })
 				.setOrderBy("S_Resource_ID").setOnlyActiveRecords(true).list();
 	}
 
@@ -513,7 +519,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 				String code = rs.getString("value");
 				int id = rs.getInt("s_resource_id");
-				String name = rs.getString("name"); 
+				String name = rs.getString("name");
 				// Use name as content if available, code is value
 				list.add(new Group(id, name));
 			}
@@ -537,189 +543,207 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				new Object[] { Integer.valueOf(p.getProperty("#AD_Role_ID")), getAdFormId() });
 		return "Y".equals(reslut);
 	}
-	
+
 	// --- Custom View Rendering ---
-	
+
 	private void renderWeekView() {
 		Calendar cal = Calendar.getInstance();
 		cal.setTime(currentViewDate);
-		
+
 		cal.setFirstDayOfWeek(Calendar.MONDAY);
 		cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
 		cal.set(Calendar.HOUR_OF_DAY, 0);
 		cal.set(Calendar.MINUTE, 0);
 		cal.set(Calendar.SECOND, 0);
 		Timestamp start = new Timestamp(cal.getTimeInMillis());
-		
+
 		cal.add(Calendar.DAY_OF_YEAR, 7);
 		Timestamp end = new Timestamp(cal.getTimeInMillis());
-		
-        // Initialize resource name map
-        Map<Integer, String> resourceNameMap = new HashMap<>();
-        if (groups != null) {
-            for (Group g : groups) {
-            	try {
-            		resourceNameMap.put(Integer.valueOf(g.getId()), g.getContent());
-            	} catch (NumberFormatException e) {
-            		// Ignore invalid IDs
-            	}
-            }
-        }
-        
+
+		// Initialize resource name map
+		Map<Integer, String> resourceNameMap = new HashMap<>();
+		if (groups != null) {
+			for (Group g : groups) {
+				try {
+					resourceNameMap.put(Integer.valueOf(g.getId()), g.getContent());
+				} catch (NumberFormatException e) {
+					// Ignore invalid IDs
+				}
+			}
+		}
+
 		List<MResourceAssignment> bookings = fetchBookings(start, end);
-		
+
 		StringBuilder html = new StringBuilder();
-		
+
 		// Styles
-        html.append("<style>");
-        html.append(".week-view-root { font-family: 'Roboto', sans-serif; height: 100%; display: flex; flex-direction: column; overflow: hidden; }");
-        html.append(".week-header { display: flex; height: 40px; border-bottom: 2px solid #ddd; background: #f5f5f5; flex-shrink: 0; }");
-        html.append(".header-time-spacer { width: 60px; min-width: 60px; border-right: 1px solid #eee; background: #f9f9f9; }");
-        html.append(".header-day { flex: 1; text-align: center; line-height: 40px; font-weight: bold; font-size: 13px; color: #444; border-right: 1px solid #eee; }");
-        html.append(".scroll-body { flex: 1; overflow-y: auto; position: relative; min-height: 0; display:flex; flex-direction:column;}");
-        html.append(".week-layout { display: flex; flex-direction: row; background: white; border: 1px solid #ddd; min-height: 960px; flex:1; }");
-        html.append(".time-col { width: 60px; flex-shrink: 0; background: #f8f9fa; border-right: 1px solid #ddd; }");
-        html.append(".time-slot { height: 40px; border-bottom: 1px solid #e0e0e0; font-size: 11px; color: #666; display: flex; align-items: start; justify-content: center; padding-top: 2px; box-sizing: border-box; }");
-        html.append(".days-grid { flex: 1; display: flex; position: relative; }");
-        html.append(".day-col { flex: 1; border-right: 1px solid #eee; position: relative; height: 960px; background: repeating-linear-gradient(to bottom, transparent 0, transparent 39px, #f5f5f5 40px); cursor: pointer; }");
-        html.append(".event-card { position: absolute; font-size: 11px; color: white; border-radius: 3px; padding: 2px 4px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.2); z-index: 10; cursor: pointer; }");
-        html.append("</style>");
-		
+		html.append("<style>");
+		html.append(
+				".week-view-root { font-family: 'Roboto', sans-serif; height: 100%; display: flex; flex-direction: column; overflow: hidden; }");
+		html.append(
+				".week-header { display: flex; height: 40px; border-bottom: 2px solid #ddd; background: #f5f5f5; flex-shrink: 0; }");
+		html.append(
+				".header-time-spacer { width: 60px; min-width: 60px; border-right: 1px solid #eee; background: #f9f9f9; }");
+		html.append(
+				".header-day { flex: 1; text-align: center; line-height: 40px; font-weight: bold; font-size: 13px; color: #444; border-right: 1px solid #eee; }");
+		html.append(
+				".scroll-body { flex: 1; overflow-y: auto; position: relative; min-height: 0; display:flex; flex-direction:column;}");
+		html.append(
+				".week-layout { display: flex; flex-direction: row; background: white; border: 1px solid #ddd; min-height: 960px; flex:1; }");
+		html.append(".time-col { width: 60px; flex-shrink: 0; background: #f8f9fa; border-right: 1px solid #ddd; }");
+		html.append(
+				".time-slot { height: 40px; border-bottom: 1px solid #e0e0e0; font-size: 11px; color: #666; display: flex; align-items: start; justify-content: center; padding-top: 2px; box-sizing: border-box; }");
+		html.append(".days-grid { flex: 1; display: flex; position: relative; }");
+		html.append(
+				".day-col { flex: 1; border-right: 1px solid #eee; position: relative; height: 960px; background: repeating-linear-gradient(to bottom, transparent 0, transparent 39px, #f5f5f5 40px); cursor: pointer; }");
+		html.append(
+				".event-card { position: absolute; font-size: 11px; color: white; border-radius: 3px; padding: 2px 4px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.2); z-index: 10; cursor: pointer; }");
+		html.append("</style>");
+
 		html.append("<div class='week-view-root'>");
-		
+
 		// Header
 		html.append("<div class='week-header'>");
 		html.append("<div class='header-time-spacer'></div>");
-		
+
 		SimpleDateFormat sdfDay = new SimpleDateFormat("EEE MM/dd");
 		SimpleDateFormat sdfKey = new SimpleDateFormat("yyyy-MM-dd");
 		cal.setTime(start);
 		List<String> dayKeys = new ArrayList<String>();
-		for (int i=0; i<7; i++) {
+		for (int i = 0; i < 7; i++) {
 			html.append("<div class='header-day'>").append(sdfDay.format(cal.getTime())).append("</div>");
 			dayKeys.add(sdfKey.format(cal.getTime()));
 			cal.add(Calendar.DAY_OF_YEAR, 1);
 		}
-		
+
 		html.append("</div>"); // End Header
-		
+
 		html.append("<div class='scroll-body'>");
 		html.append("<div class='week-layout'>");
-		
+
 		// Time Column
 		html.append("<div class='time-col'>");
-		for (int i=0; i<24; i++) {
+		for (int i = 0; i < 24; i++) {
 			html.append("<div class='time-slot'>").append(String.format("%02d:00", i)).append("</div>");
 		}
 		html.append("</div>");
-		
+
 		// Days Grid
 		html.append("<div class='days-grid'>");
 		for (String dayKey : dayKeys) {
-			String defaultResId = (groups!=null && groups.size()>0 ? groups.get(0).getId().toString() : ""); // Ensure string
-			html.append("<div class='day-col' onclick=\"onWeekDayClick(event, this, '"+dayKey+"', '"+defaultResId+"');\">");
-			
-            // 1. Filter events for this day
-            List<MResourceAssignment> dayEvents = new ArrayList<>();
+			String defaultResId = (groups != null && groups.size() > 0 ? groups.get(0).getId().toString() : ""); // Ensure
+																													// string
+			html.append("<div class='day-col' onclick=\"onWeekDayClick(event, this, '" + dayKey + "', '" + defaultResId
+					+ "');\">");
+
+			// 1. Filter events for this day
+			List<MResourceAssignment> dayEvents = new ArrayList<>();
 			for (MResourceAssignment b : bookings) {
 				String dayStr = sdfKey.format(b.getAssignDateFrom());
 				if (dayStr.equals(dayKey)) {
-                    dayEvents.add(b);
-                }
-            }
-            
-            // 2. Sort by start time, then end time
-            Collections.sort(dayEvents, new Comparator<MResourceAssignment>() {
-                public int compare(MResourceAssignment o1, MResourceAssignment o2) {
-                    int val = o1.getAssignDateFrom().compareTo(o2.getAssignDateFrom());
-                    if (val == 0) return o2.getAssignDateTo().compareTo(o1.getAssignDateTo());
-                    return val;
-                }
-            });
+					dayEvents.add(b);
+				}
+			}
 
-            // 3. Pack into columns (simple greedy algorithm)
-            List<List<MResourceAssignment>> columns = new ArrayList<>();
-            for (MResourceAssignment evt : dayEvents) {
-                boolean placed = false;
-                for (List<MResourceAssignment> col : columns) {
-                    MResourceAssignment last = col.get(col.size()-1);
-                    // Check if evt starts after last event ends (>=)
-                    if (evt.getAssignDateFrom().getTime() >= last.getAssignDateTo().getTime()) {
-                        col.add(evt);
-                        placed = true;
-                        break;
-                    }
-                }
-                if (!placed) {
-                    List<MResourceAssignment> newCol = new ArrayList<>();
-                    newCol.add(evt);
-                    columns.add(newCol);
-                }
-            }
+			// 2. Sort by start time, then end time
+			Collections.sort(dayEvents, new Comparator<MResourceAssignment>() {
+				public int compare(MResourceAssignment o1, MResourceAssignment o2) {
+					int val = o1.getAssignDateFrom().compareTo(o2.getAssignDateFrom());
+					if (val == 0)
+						return o2.getAssignDateTo().compareTo(o1.getAssignDateTo());
+					return val;
+				}
+			});
 
-            // 4. Render columns
-            int numCols = columns.size();
-            double colWidthPercent = 95.0 / (numCols > 0 ? numCols : 1);
-            
-            for (int colIndex = 0; colIndex < numCols; colIndex++) {
-                List<MResourceAssignment> col = columns.get(colIndex);
-                for (MResourceAssignment b : col) {
+			// 3. Pack into columns (simple greedy algorithm)
+			List<List<MResourceAssignment>> columns = new ArrayList<>();
+			for (MResourceAssignment evt : dayEvents) {
+				boolean placed = false;
+				for (List<MResourceAssignment> col : columns) {
+					MResourceAssignment last = col.get(col.size() - 1);
+					// Check if evt starts after last event ends (>=)
+					if (evt.getAssignDateFrom().getTime() >= last.getAssignDateTo().getTime()) {
+						col.add(evt);
+						placed = true;
+						break;
+					}
+				}
+				if (!placed) {
+					List<MResourceAssignment> newCol = new ArrayList<>();
+					newCol.add(evt);
+					columns.add(newCol);
+				}
+			}
+
+			// 4. Render columns
+			int numCols = columns.size();
+			double colWidthPercent = 95.0 / (numCols > 0 ? numCols : 1);
+
+			for (int colIndex = 0; colIndex < numCols; colIndex++) {
+				List<MResourceAssignment> col = columns.get(colIndex);
+				for (MResourceAssignment b : col) {
 					long startMs = b.getAssignDateFrom().getTime();
 					long endMs = b.getAssignDateTo().getTime();
-					
+
 					// Calculate offset from day start 00:00
 					Calendar dayStart = Calendar.getInstance();
 					dayStart.setTime(b.getAssignDateFrom());
 					dayStart.set(Calendar.HOUR_OF_DAY, 0);
 					dayStart.set(Calendar.MINUTE, 0);
 					dayStart.set(Calendar.SECOND, 0);
-					
+
 					long offsetMs = startMs - dayStart.getTimeInMillis();
 					long durationMs = endMs - startMs;
-					
+
 					double pxPerMin = 40.0 / 60.0;
 					double top = (offsetMs / 60000.0) * pxPerMin;
 					double height = (durationMs / 60000.0) * pxPerMin;
-					if (height < 15) height = 15;
-                    
-                    double left = 2.0 + (colIndex * colWidthPercent);
-                    double width = colWidthPercent - 2.0; 
-					
+					if (height < 15)
+						height = 15;
+
+					double left = 2.0 + (colIndex * colWidthPercent);
+					double width = colWidthPercent - 2.0;
+
 					MUser user = new MUser(Env.getCtx(), b.getCreatedBy(), null);
-                    
-                    String resName = resourceNameMap.getOrDefault(b.getS_Resource_ID(), "");
-                    if (!resName.isEmpty()) resName = "[" + resName + "] ";                    
+
+					String resName = resourceNameMap.getOrDefault(b.getS_Resource_ID(), "");
+					if (!resName.isEmpty())
+						resName = "[" + resName + "] ";
 					String title = resName + b.getName() + " (" + user.getName() + ")";
 
-                    // Escape single quotes in strings to avoid JS errors
+					// Escape single quotes in strings to avoid JS errors
 					// Encode strictly for JS string
-                    String color = getResourceColor(b.getS_Resource_ID());
-                    String displayContent = title;
-                    if (b.getDescription() != null && !b.getDescription().isEmpty()) {
-                        displayContent += "<br/><span style='font-size:10px; opacity:0.9;'>" + b.getDescription() + "</span>";
-                    }
+					String color = getResourceColor(b.getS_Resource_ID());
+					String displayContent = title;
+					if (b.getDescription() != null && !b.getDescription().isEmpty()) {
+						displayContent += "<br/><span style='font-size:10px; opacity:0.9;'>" + b.getDescription()
+								+ "</span>";
+					}
 
-                    // Encode strictly for JS string
-                    String nameJS = b.getName().replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\""); 
-                    // Description often has newlines; replace them to avoid breaking JS string
-                    String descJS = "";
-                    if (b.getDescription() != null) {
-                    	descJS = b.getDescription().replace("\r", "").replace("\n", " ").replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"");
-                    }
+					// Encode strictly for JS string
+					String nameJS = b.getName().replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"");
+					// Description often has newlines; replace them to avoid breaking JS string
+					String descJS = "";
+					if (b.getDescription() != null) {
+						descJS = b.getDescription().replace("\r", "").replace("\n", " ").replace("\\", "\\\\")
+								.replace("'", "\\'").replace("\"", "\\\"");
+					}
 
-					html.append(String.format("<div class='event-card' style='top:%.1fpx; height:%.1fpx; background-color:%s; width:%.1f%%; left:%.1f%%;' "
-							+ "onclick=\"onWeekEventClick(event, '%s', '%s', '%s', '%s', %s, %s);\">%s</div>",
-							top, height, color, width, left, b.getS_ResourceAssignment_ID(), nameJS, descJS, b.getS_Resource_ID(), startMs, endMs, displayContent));
-                }
-            }
-			
+					html.append(String.format(
+							"<div class='event-card' style='top:%.1fpx; height:%.1fpx; background-color:%s; width:%.1f%%; left:%.1f%%;' "
+									+ "onclick=\"onWeekEventClick(event, '%s', '%s', '%s', '%s', %s, %s);\">%s</div>",
+							top, height, color, width, left, b.getS_ResourceAssignment_ID(), nameJS, descJS,
+							b.getS_Resource_ID(), startMs, endMs, displayContent));
+				}
+			}
+
 			html.append("</div>");
 		}
 		html.append("</div>"); // days-grid
 		html.append("</div>"); // week-layout
 		html.append("</div>"); // scroll-body
 		html.append("</div>"); // root
-		
+
 		// Auto scroll to 8am
 		// Script for Week View Logic
 		html.append("<script>");
@@ -741,7 +765,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		html.append("  if(el) el.scrollTop = 320;");
 		html.append("}, 200);");
 		html.append("</script>");
-		
+
 		Html zkHtml = new Html();
 		zkHtml.setHflex("1");
 		zkHtml.setVflex("1");
@@ -752,7 +776,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	private void renderMonthView() {
 		Calendar cal = Calendar.getInstance();
 		cal.setTime(currentViewDate);
-		
+
 		cal.set(Calendar.DAY_OF_MONTH, 1);
 		int currentMonth = cal.get(Calendar.MONTH);
 		cal.setFirstDayOfWeek(Calendar.MONDAY);
@@ -764,11 +788,11 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		// Actually typical logic: set to 1st, then while day != Monday subtract 1
 		cal.setTime(currentViewDate);
 		cal.set(Calendar.DAY_OF_MONTH, 1);
-		while(cal.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
+		while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
 			cal.add(Calendar.DATE, -1);
 		}
 		Timestamp start = new Timestamp(cal.getTimeInMillis());
-		
+
 		// End date: 6 weeks (42 days) from start is usually enough to cover
 		cal.add(Calendar.DATE, 35); // 5 rows
 		// Check if we cover the whole month
@@ -781,110 +805,127 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			cal.add(Calendar.DATE, 7); // add one more week
 		}
 		Timestamp end = new Timestamp(cal.getTimeInMillis());
-		
-        // Initialize resource name map
-        Map<Integer, String> resourceNameMap = new HashMap<>();
-        if (groups != null) {
-            for (Group g : groups) {
-            	try {
-            		resourceNameMap.put(Integer.valueOf(g.getId()), g.getContent());
-            	} catch (NumberFormatException e) {
-            		// Ignore invalid IDs
-            	}
-            }
-        }
-        
+
+		// Initialize resource name map
+		Map<Integer, String> resourceNameMap = new HashMap<>();
+		if (groups != null) {
+			for (Group g : groups) {
+				try {
+					resourceNameMap.put(Integer.valueOf(g.getId()), g.getContent());
+				} catch (NumberFormatException e) {
+					// Ignore invalid IDs
+				}
+			}
+		}
+
 		List<MResourceAssignment> bookings = fetchBookings(start, end);
-		
+
 		StringBuilder html = new StringBuilder();
-		
-        html.append("<style>");
-        html.append(".month-view-root { font-family: 'Roboto', sans-serif; background: transparent; padding: 0; margin: 0; height: 100%; display: flex; flex-direction: column; }");
-        html.append(".month-container { display: flex; flex-direction: column; height: 100%; border: 1px solid #ddd; background: white; flex: 1; }");
-        html.append(".month-header-row { display: flex; height: 30px; background: #f5f5f5; border-bottom: 1px solid #ddd; flex-shrink: 0; }");
-        html.append(".month-day-header { flex: 1; text-align: center; line-height: 30px; font-weight: bold; color: #666; font-size: 13px; border-right: 1px solid #eee; }");
-        html.append(".month-grid { display: flex; flex: 1; flex-wrap: wrap; overflow-y: auto; align-content: flex-start; }");
-        html.append(".month-cell { width: 14.28%; height: 20%; min-height: 100px; border-right: 1px solid #eee; border-bottom: 1px solid #eee; box-sizing: border-box; padding: 4px; overflow-y: auto; cursor: pointer; }");
-        html.append(".date-label { font-size: 12px; font-weight: bold; color: #333; margin-bottom: 4px; }");
-        html.append(".date-label.other-month { color: #ccc; }");
-        html.append(".m-event { font-size: 10px; margin-bottom: 2px; padding: 1px 3px; border-radius: 2px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }");
-        html.append("</style>");
-		
+
+		html.append("<style>");
+		html.append(
+				".month-view-root { font-family: 'Roboto', sans-serif; background: transparent; padding: 0; margin: 0; height: 100%; display: flex; flex-direction: column; }");
+		html.append(
+				".month-container { display: flex; flex-direction: column; height: 100%; border: 1px solid #ddd; background: white; flex: 1; }");
+		html.append(
+				".month-header-row { display: flex; height: 30px; background: #f5f5f5; border-bottom: 1px solid #ddd; flex-shrink: 0; }");
+		html.append(
+				".month-day-header { flex: 1; text-align: center; line-height: 30px; font-weight: bold; color: #666; font-size: 13px; border-right: 1px solid #eee; }");
+		html.append(
+				".month-grid { display: flex; flex: 1; flex-wrap: wrap; overflow-y: auto; align-content: flex-start; }");
+		html.append(
+				".month-cell { width: 14.28%; height: 20%; min-height: 100px; border-right: 1px solid #eee; border-bottom: 1px solid #eee; box-sizing: border-box; padding: 4px; overflow-y: auto; cursor: pointer; }");
+		html.append(".date-label { font-size: 12px; font-weight: bold; color: #333; margin-bottom: 4px; }");
+		html.append(".date-label.other-month { color: #ccc; }");
+		html.append(
+				".m-event { font-size: 10px; margin-bottom: 2px; padding: 1px 3px; border-radius: 2px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }");
+		html.append("</style>");
+
 		html.append("<div class='month-view-root'>");
-        html.append("<div class='month-container'>");
-        
-        // Header
-        html.append("<div class='month-header-row'>");
-        String[] days = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
-        for (String d : days) html.append("<div class='month-day-header'>").append(d).append("</div>");
-        html.append("</div>");
-        
-        // Grid
-        html.append("<div class='month-grid'>");
-        
-        cal.setTime(start);
-        SimpleDateFormat sdfKey = new SimpleDateFormat("yyyy-MM-dd");
-        
-        while(cal.getTimeInMillis() < end.getTime()) {
-        	String dayKey = sdfKey.format(cal.getTime());
-        	boolean isOther = cal.get(Calendar.MONTH) != currentMonth;
-        	
-        	html.append("<div class='month-cell' onclick=\"window.openCustomAddDialog('"+dayKey+"', 540, '"+(groups!=null && groups.size()>0 ? groups.get(0).getId() : "")+"');\">");
-        	html.append("<div class='date-label").append(isOther?" other-month":"").append("'>").append(cal.get(Calendar.DAY_OF_MONTH)).append("</div>");
-        	
-        	// Render events
-        	for(MResourceAssignment b : bookings) {
-        		// Simplified whole-day check or start-day check
-        		// This logic doesn't handle multi-day events well visually (repeats them), but good enough for MVP
-        		// Check if b intersects with this day
-        		long dayStart = cal.getTimeInMillis();
-        		long dayEnd = dayStart + 86400000L;
-        		if(b.getAssignDateFrom().getTime() < dayEnd && b.getAssignDateTo().getTime() > dayStart) {
-        			MUser user = new MUser(Env.getCtx(), b.getCreatedBy(), null);
-                    String nameEsc = b.getName().replace("'", "\\'");
-                    String descEsc = (b.getDescription() != null ? b.getDescription().replace("\n", " ").replace("'", "\\'") : "");
-                    String color = getResourceColor(b.getS_Resource_ID());
-                    
-                    String resName = resourceNameMap.getOrDefault(b.getS_Resource_ID(), "");
-                    if (!resName.isEmpty()) resName = "[" + resName + "] ";    
-                    
-                    SimpleDateFormat sdfTime = new SimpleDateFormat("HH:mm");
-                    String timeRange = sdfTime.format(b.getAssignDateFrom()) + " - " + sdfTime.format(b.getAssignDateTo());
-                    String tooltip = String.format("Applicant: %s\nTime: %s\nSubject: %s\nDescription: %s", 
-                            user.getName(), timeRange, b.getName(), (b.getDescription()!=null?b.getDescription():""));
-                    // Escape single quotes for HTML attribute
-                    tooltip = tooltip.replace("'", "&#39;");
-                    
-                    html.append(String.format("<div class='m-event' style='background-color:%s;' title='%s' "
-                    		+ "onclick=\"event.stopPropagation(); window.openCustomEditDialog('%d', '%s', '%s', '%d', %d, %d);\">%s%s</div>",
-                    		color, tooltip, b.getS_ResourceAssignment_ID(), nameEsc, descEsc, b.getS_Resource_ID(), b.getAssignDateFrom().getTime(), b.getAssignDateTo().getTime(), resName, b.getName()));
-        		}
-        	}
-        	
-        	html.append("</div>");
-        	cal.add(Calendar.DATE, 1);
-        }
-        
-        html.append("</div></div></div>");
-        
+		html.append("<div class='month-container'>");
+
+		// Header
+		html.append("<div class='month-header-row'>");
+		String[] days = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
+		for (String d : days)
+			html.append("<div class='month-day-header'>").append(d).append("</div>");
+		html.append("</div>");
+
+		// Grid
+		html.append("<div class='month-grid'>");
+
+		cal.setTime(start);
+		SimpleDateFormat sdfKey = new SimpleDateFormat("yyyy-MM-dd");
+
+		while (cal.getTimeInMillis() < end.getTime()) {
+			String dayKey = sdfKey.format(cal.getTime());
+			boolean isOther = cal.get(Calendar.MONTH) != currentMonth;
+
+			html.append("<div class='month-cell' onclick=\"window.openCustomAddDialog('" + dayKey + "', 540, '"
+					+ (groups != null && groups.size() > 0 ? groups.get(0).getId() : "") + "');\">");
+			html.append("<div class='date-label").append(isOther ? " other-month" : "").append("'>")
+					.append(cal.get(Calendar.DAY_OF_MONTH)).append("</div>");
+
+			// Render events
+			for (MResourceAssignment b : bookings) {
+				// Simplified whole-day check or start-day check
+				// This logic doesn't handle multi-day events well visually (repeats them), but
+				// good enough for MVP
+				// Check if b intersects with this day
+				long dayStart = cal.getTimeInMillis();
+				long dayEnd = dayStart + 86400000L;
+				if (b.getAssignDateFrom().getTime() < dayEnd && b.getAssignDateTo().getTime() > dayStart) {
+					MUser user = new MUser(Env.getCtx(), b.getCreatedBy(), null);
+					String nameEsc = b.getName().replace("'", "\\'");
+					String descEsc = (b.getDescription() != null
+							? b.getDescription().replace("\n", " ").replace("'", "\\'")
+							: "");
+					String color = getResourceColor(b.getS_Resource_ID());
+
+					String resName = resourceNameMap.getOrDefault(b.getS_Resource_ID(), "");
+					if (!resName.isEmpty())
+						resName = "[" + resName + "] ";
+
+					SimpleDateFormat sdfTime = new SimpleDateFormat("HH:mm");
+					String timeRange = sdfTime.format(b.getAssignDateFrom()) + " - "
+							+ sdfTime.format(b.getAssignDateTo());
+					String tooltip = String.format("Applicant: %s\nTime: %s\nSubject: %s\nDescription: %s",
+							user.getName(), timeRange, b.getName(),
+							(b.getDescription() != null ? b.getDescription() : ""));
+					// Escape single quotes for HTML attribute
+					tooltip = tooltip.replace("'", "&#39;");
+
+					html.append(String.format("<div class='m-event' style='background-color:%s;' title='%s' "
+							+ "onclick=\"event.stopPropagation(); window.openCustomEditDialog('%d', '%s', '%s', '%d', %d, %d);\">%s%s</div>",
+							color, tooltip, b.getS_ResourceAssignment_ID(), nameEsc, descEsc, b.getS_Resource_ID(),
+							b.getAssignDateFrom().getTime(), b.getAssignDateTo().getTime(), resName, b.getName()));
+				}
+			}
+
+			html.append("</div>");
+			cal.add(Calendar.DATE, 1);
+		}
+
+		html.append("</div></div></div>");
+
 		Html zkHtml = new Html();
 		zkHtml.setHflex("1");
 		zkHtml.setVflex("1");
 		zkHtml.setContent(html.toString());
 		bookingContainer.appendChild(zkHtml);
 	}
-	
+
 	/**
 	 * Returns a deterministic color for a resource ID.
-    */
-   private String getResourceColor(int resourceId) {
-       // Palette of pleasing colors (Material Design / Google Calendar style)
-       String[] colors = {
-           "#EF5350", "#EC407A", "#AB47BC", "#7E57C2", "#5C6BC0", 
-           "#42A5F5", "#29B6F6", "#26C6DA", "#26A69A", "#66BB6A", 
-           "#9CCC65", "#D4E157", "#FFEE58", "#FFCA28", "#FFA726", 
-           "#FF7043", "#8D6E63", "#BDBDBD", "#78909C"
-       };
-       return colors[Math.abs(resourceId) % colors.length];
-   }
+	 */
+	private String getResourceColor(int resourceId) {
+		// Palette of pleasing colors (Material Design / Google Calendar style)
+		String[] colors = {
+				"#C62828", "#AD1457", "#6A1B9A", "#4527A0", "#283593",
+				"#1565C0", "#0277BD", "#00838F", "#00695C", "#2E7D32",
+				"#558B2F", "#9E9D24", "#F9A825", "#FF8F00", "#EF6C00",
+				"#D84315", "#4E342E", "#424242", "#37474F"
+		};
+		return colors[Math.abs(resourceId) % colors.length];
+	}
 }

@@ -36,4 +36,5 @@ Service-Component: OSGI-INF/tw.ninniku.booking.model.factory.xml,
  OSGI-INF/tw.ninniku.booking.form.factory.xml,
  OSGI-INF/tw.ninniku.booking.process.factory.xml
 Bundle-ClassPath: .,
- src/
+ src/,
+ WEB-INF/
