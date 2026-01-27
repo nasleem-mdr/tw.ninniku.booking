@@ -55,7 +55,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private static final long serialVersionUID = 1L;
 	private ArrayList<Group> groups;
-	String version = "3.06";
+	String version = "3.10";
 	Textbox dateStart;
 	Textbox dateEnd;
 	Textbox dateLast;
@@ -72,6 +72,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	private Div bookingContainer;
 	private Button btnViewTimeline, btnViewWeek, btnViewMonth;
 	private Button btnPrev, btnNext, btnToday, btnRefresh, btnAddBooking;
+	private org.zkoss.zul.Checkbox chkWorkHours;
 
 	private static final String VIEW_TIMELINE = "TIMELINE";
 	private static final String VIEW_WEEK = "WEEK";
@@ -166,6 +167,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		} else if (event.getTarget().getId().equals("resourceType")) {
 			renewGroup();
+			refreshView();
+		} else if (event.getTarget() == chkWorkHours) {
 			refreshView();
 		}
 
@@ -412,7 +415,12 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		btnViewMonth = (Button) component.getFellow("btnViewMonth");
 		btnPrev = (Button) component.getFellow("btnPrev");
 		btnNext = (Button) component.getFellow("btnNext");
+		btnPrev = (Button) component.getFellow("btnPrev");
+		btnNext = (Button) component.getFellow("btnNext");
 		btnToday = (Button) component.getFellow("btnToday");
+
+		chkWorkHours = (org.zkoss.zul.Checkbox) component.getFellow("chkWorkHours");
+		chkWorkHours.addEventListener(Events.ON_CHECK, this);
 
 		bookingContainer = (Div) component.getFellow("bookingContainer");
 
@@ -637,9 +645,15 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		StringBuilder html = new StringBuilder();
 
-		// CSS is handled in booking.css
+		// Determine view range based on toggle
+		boolean workHoursOnly = chkWorkHours != null && chkWorkHours.isChecked();
+		int startHour = workHoursOnly ? 8 : 0;
+		int endHour = workHoursOnly ? 18 : 23;
+		int hourCount = endHour - startHour + 1;
+		int pxPerHour = 40;
+		int heightPx = hourCount * pxPerHour;
 
-		html.append("<div class='week-view-root'>");
+		html.append("<div class='week-view-root' data-start-hour='" + startHour + "'>");
 
 		// Header
 		html.append("<div class='week-header'>");
@@ -658,11 +672,11 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		html.append("</div>"); // End Header
 
 		html.append("<div class='scroll-body'>");
-		html.append("<div class='week-layout'>");
+		html.append("<div class='week-layout' style='min-height: " + heightPx + "px;'>");
 
 		// Time Column
 		html.append("<div class='time-col'>");
-		for (int i = 0; i < 24; i++) {
+		for (int i = startHour; i <= endHour; i++) { // Limit range
 			html.append("<div class='time-slot'>").append(String.format("%02d:00", i)).append("</div>");
 		}
 		html.append("</div>");
@@ -670,9 +684,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		// Days Grid
 		html.append("<div class='days-grid'>");
 		for (String dayKey : dayKeys) {
-			String defaultResId = (groups != null && groups.size() > 0 ? groups.get(0).getId().toString() : ""); // Ensure
-																													// string
-			html.append("<div class='day-col' data-date='" + dayKey + "' data-resource-id='" + defaultResId + "'>");
+			String defaultResId = (groups != null && groups.size() > 0 ? groups.get(0).getId().toString() : "");
+			html.append("<div class='day-col' data-date='" + dayKey + "' data-resource-id='" + defaultResId
+					+ "' style='height: " + heightPx + "px;'>");
 
 			// 1. Filter events for this day
 			List<MResourceAssignment> dayEvents = new ArrayList<>();
@@ -729,10 +743,12 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 					// Calculate offset from day start 00:00
 					Calendar dayStart = Calendar.getInstance();
 					dayStart.setTime(b.getAssignDateFrom());
-					dayStart.set(Calendar.HOUR_OF_DAY, 0);
+					dayStart.set(Calendar.HOUR_OF_DAY, startHour); // Base is dynamic
 					dayStart.set(Calendar.MINUTE, 0);
 					dayStart.set(Calendar.SECOND, 0);
 
+					// If event starts before startHour, we clamp it visually or just let it be
+					// negative
 					long offsetMs = startMs - dayStart.getTimeInMillis();
 					long durationMs = endMs - startMs;
 
@@ -797,17 +813,15 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		html.append("</div>"); // scroll-body
 		html.append("</div>"); // root
 
-		// Auto scroll to 8am
-		// Script for Week View Logic
-		html.append("<script>");
-		html.append("if (window.weekViewScrollTo8Am) { window.weekViewScrollTo8Am(); }");
-		html.append("</script>");
-
 		Html zkHtml = new Html();
 		zkHtml.setHflex("1");
 		zkHtml.setVflex("1");
 		zkHtml.setContent(html.toString());
 		bookingContainer.appendChild(zkHtml);
+
+		// triggers client rendering
+		// Clients.evalJavaScript("setTimeout(function(){ if(window.weekViewScrollTo8Am)
+		// window.weekViewScrollTo8Am(); }, 100);");
 	}
 
 	private void renderMonthView() {
