@@ -54,7 +54,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private static final long serialVersionUID = 1L;
 	private ArrayList<Group> groups;
-	String version = "3.03";
+	String version = "3.06";
 	Textbox dateStart;
 	Textbox dateEnd;
 	Textbox dateLast;
@@ -647,6 +647,12 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				".event-card { position: absolute; font-size: 11px; color: white; border-radius: 3px; padding: 2px 4px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.2); z-index: 10; cursor: pointer; }");
 		html.append(
 				".drag-ghost { position: absolute; background: rgba(33, 150, 243, 0.6); border: 2px solid #1565C0; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 100; pointer-events: none; }");
+		html.append(
+				".drag-tooltip { position: fixed; background: rgba(0, 0, 0, 0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 2147483647; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }");
+		html.append(
+				".delete-icon { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; line-height: 16px; text-align: center; color: rgba(255,255,255,0.7); font-weight: bold; cursor: pointer; border-radius: 50%; z-index: 20; }");
+		html.append(
+				".delete-icon:hover { color: #fff; background-color: rgba(255,0,0,0.7); }");
 		html.append("</style>");
 
 		html.append("<div class='week-view-root'>");
@@ -727,6 +733,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			int numCols = columns.size();
 			double colWidthPercent = 95.0 / (numCols > 0 ? numCols : 1);
 
+			boolean canWrite = isWritable();
+			int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
+
 			for (int colIndex = 0; colIndex < numCols; colIndex++) {
 				List<MResourceAssignment> col = columns.get(colIndex);
 				for (MResourceAssignment b : col) {
@@ -768,6 +777,14 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 								+ "</span>";
 					}
 
+					// Delete Icon Logic
+					String deleteIconHtml = "";
+					if (canWrite || b.getCreatedBy() == adUserId) {
+						deleteIconHtml = String.format(
+								"<span class='delete-icon' onclick='window.onWeekEventDelete(event, %d)'>&times;</span>",
+								b.getS_ResourceAssignment_ID());
+					}
+
 					// Encode strictly for JS string
 					String nameJS = b.getName().replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"");
 					// Description often has newlines; replace them to avoid breaking JS string
@@ -779,9 +796,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 					html.append(String.format(
 							"<div class='event-card' style='top:%.1fpx; height:%.1fpx; background-color:%s; width:%.1f%%; left:%.1f%%;' "
-									+ "onclick=\"onWeekEventClick(event, '%s', '%s', '%s', '%s', %s, %s);\">%s</div>",
+									+ "onclick=\"onWeekEventClick(event, '%s', '%s', '%s', '%s', %s, %s);\">%s%s</div>",
 							top, height, color, width, left, b.getS_ResourceAssignment_ID(), nameJS, descJS,
-							b.getS_Resource_ID(), startMs, endMs, displayContent));
+							b.getS_Resource_ID(), startMs, endMs, displayContent, deleteIconHtml));
 				}
 			}
 

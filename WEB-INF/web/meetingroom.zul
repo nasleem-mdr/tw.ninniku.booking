@@ -30,7 +30,20 @@
     <style src="/styles/jquery-ui.css"/> 
     <style src="/styles/jquery.toast.css"/> 
     <style src="/styles/booking.css"/> 
-  <style></style>
+  <style>
+    .drag-tooltip {
+        position: fixed;
+        background: rgba(0, 0, 0, 0.8);
+        color: white;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 12px;
+        pointer-events: none;
+        z-index: 2147483647;
+        white-space: nowrap;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+    }
+  </style>
 <n:script xmlns:n="native">
 <![CDATA[
 // Fallback: Define global functions here in case booking.js is cached/stale
@@ -86,6 +99,30 @@ window.weekViewScrollTo8Am = function () {
 	}, 200);
 };
 
+window.onWeekEventDelete = function (event, id) {
+    event.stopPropagation();
+    if (confirm('Are you sure you want to delete this booking?')) {
+        // Find ZK widgets for hidden fields
+        var itemDataWidget = zk.Widget.$('$itemData');
+        var boookingDeletedWidget = zk.Widget.$('$bookingDeleted');
+        
+        var json = JSON.stringify({id: String(id)});
+        
+        if (itemDataWidget && boookingDeletedWidget) {
+            itemDataWidget.setValue(json);
+            itemDataWidget.fireOnChange();
+            
+            boookingDeletedWidget.setValue('DELETE-' + id);
+            boookingDeletedWidget.fireOnChange();
+        } else {
+            // JQuery Fallback
+             var $ = window.$ || window.jQuery || window.jq;
+             $('#itemData').val(json).trigger('change');
+             $('#bookingDeleted').val('DELETE-' + id).trigger('change');
+        }
+    }
+};
+
 // --- Drag and Drop Logic (Inline Fallback) ---
 (function () {
     var $ = window.$ || window.jQuery || window.jq;
@@ -101,7 +138,34 @@ window.weekViewScrollTo8Am = function () {
 
 	var dragStartData = null;
 	var dragGhost = null;
+    var dragTooltip = null;
 	var isDragging = false;
+
+    // Helper: Round date to nearest 30 minutes
+    function snapTo30(d) {
+        var m = d.getMinutes();
+        var r = Math.round(m / 30) * 30;
+        d.setMinutes(r, 0, 0);
+        return d;
+    }
+
+    // Helper: Format time as HH:mm
+    function formatTime(date) {
+        var h = date.getHours();
+        var m = date.getMinutes();
+        return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
+    }
+
+    // Helper: Format duration
+    function formatDuration(diffMs) {
+        var diffMins = Math.round(diffMs / 60000);
+        var h = Math.floor(diffMins / 60);
+        var m = diffMins % 60;
+        var str = '';
+        if (h > 0) str += h + 'h ';
+        if (m > 0 || h === 0) str += m + 'm';
+        return str.trim();
+    }
 
 	function initDragEvents() {
         $ = window.$ || window.jQuery || window.jq;
@@ -136,6 +200,10 @@ window.weekViewScrollTo8Am = function () {
 			};
 			isDragging = false;
             _weekViewWasDragging = false;
+            
+            // Remove existing tooltip if any
+            $('.drag-tooltip').remove();
+            dragTooltip = null;
 		});
 
 		$(document).on('mousemove.weekview', function (e) {
@@ -154,6 +222,14 @@ window.weekViewScrollTo8Am = function () {
                 } else {
                     dragGhost = $('.drag-ghost');
                 }
+                
+                // Create Tooltip
+                if ($('.drag-tooltip').length === 0) {
+                    dragTooltip = $('<div class="drag-tooltip"></div>');
+                    $('body').append(dragTooltip);
+                } else {
+                    dragTooltip = $('.drag-tooltip');
+                }
 			}
 
 			if (isDragging) {
@@ -163,6 +239,32 @@ window.weekViewScrollTo8Am = function () {
 					top: top + 'px',
 					height: height + 'px'
 				});
+                
+                // Calculate Times for Tooltip
+                var startY = Math.min(dragStartData.startY, currentY);
+				var endY = Math.max(dragStartData.startY, currentY);
+                if (endY - startY < 10) endY = startY + 10;
+                
+                var start = getTimeFromY(startY, dragStartData.dayKey);
+				var end = getTimeFromY(endY, dragStartData.dayKey);
+                
+                start = snapTo30(start);
+                end = snapTo30(end);
+                 
+                if (end.getTime() <= start.getTime()) {
+                    end = new Date(start.getTime() + 30 * 60000);
+                }
+                
+                var timeStr = formatTime(start) + ' - ' + formatTime(end);
+                var durStr = '(' + formatDuration(end - start) + ')';
+                
+                dragTooltip.text(timeStr + ' ' + durStr);
+                
+                // Position tooltip near cursor but not under it
+                dragTooltip.css({
+                    top: (e.clientY - 40) + 'px',
+                    left: (e.clientX + 15) + 'px'
+                });
 			}
 		});
 
@@ -183,14 +285,6 @@ window.weekViewScrollTo8Am = function () {
 				var start = getTimeFromY(startY, dragStartData.dayKey);
 				var end = getTimeFromY(endY, dragStartData.dayKey);
 
-                // Round to nearest 30 minutes
-                function snapTo30(d) {
-                    var m = d.getMinutes();
-                    var r = Math.round(m / 30) * 30;
-                    d.setMinutes(r, 0, 0);
-                    return d;
-                }
-                
                 start = snapTo30(start);
                 end = snapTo30(end);
                 
@@ -207,10 +301,10 @@ window.weekViewScrollTo8Am = function () {
                 dragGhost = null;
                 _weekViewWasDragging = true; // Prevent click event from firing
 			} 
-            // If not dragging, the existing onclick handler on the div might trigger?
-            // actually we are preventing default on mousedown, so click might not fire reliably?
-            // But we have `onWeekDayClick` which is inline `onclick`... 
-            // Let's rely on standard onclick if no drag.
+            
+            // Cleanup
+            $('.drag-tooltip').remove();
+            dragTooltip = null;
             
 			dragStartData = null;
 			isDragging = false;
