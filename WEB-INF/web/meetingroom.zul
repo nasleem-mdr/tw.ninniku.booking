@@ -47,6 +47,10 @@
 .drag-tooltip { position: fixed; background: rgba(0, 0, 0, 0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 2147483647; white-space: nowrap; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
 .delete-icon { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; line-height: 16px; text-align: center; color: rgba(255, 255, 255, 0.7); font-weight: bold; cursor: pointer; border-radius: 50%; z-index: 20; }
 .delete-icon:hover { color: #fff; background-color: rgba(255, 0, 0, 0.7); }
+/* Resize Handle */
+.resize-handle { position: absolute; bottom: 0; left: 0; width: 100%; height: 8px; cursor: ns-resize; z-index: 30; }
+/* Dragging State */
+.event-card.dragging { opacity: 0.5; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 100 !important; pointer-events: none; }
 /* Validation Styles */
 .input-error { border: 2px solid #D32F2F !important; background-color: #FFEBEE !important; }
 .error-text { color: #D32F2F; font-size: 11px; display: block; margin-top: 2px; font-weight: bold; }
@@ -299,30 +303,38 @@
             }
         };
 
-        /* Drag and Drop Logic */
+        /* Drag and Drop Logic (Create, Move, Resize) */
         (function () {
             var $ = window.$ || window.jQuery || window.jq;
+
             function getTimeFromY(y, dayKey) {
                 var mins = (y / 40) * 60;
                 var date = new Date(dayKey + 'T00:00:00');
                 date.setMinutes(date.getMinutes() + mins);
                 return date;
             }
-            var dragStartData = null;
+
+            // State variables
+            var dragMode = null; // 'create', 'move', 'resize'
+            var dragData = null; // Stores initial data (nodes, start times, etc.)
             var dragGhost = null;
             var dragTooltip = null;
             var isDragging = false;
+            
+            // Helper for 30m snap
             function snapTo30(d) {
                 var m = d.getMinutes();
                 var r = Math.round(m / 30) * 30;
                 d.setMinutes(r, 0, 0);
                 return d;
             }
+
             function formatTime(date) {
                 var h = date.getHours();
                 var m = date.getMinutes();
                 return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
             }
+
             function formatDuration(diffMs) {
                 var diffMins = Math.round(diffMs / 60000);
                 var h = Math.floor(diffMins / 60);
@@ -332,91 +344,313 @@
                 if (m > 0 || h === 0) str += m + 'm';
                 return str.trim();
             }
+
             function initDragEvents() {
                 $ = window.$ || window.jQuery || window.jq;
                 if (typeof $ === 'undefined') {
                     setTimeout(initDragEvents, 100);
                     return;
                 }
+
                 $(document).off('mousedown', '.day-col');
+                $(document).off('mousedown', '.resize-handle');
+                $(document).off('mousedown', '.event-card');
                 $(document).off('mousemove.weekview');
                 $(document).off('mouseup.weekview');
-                $(document).on('mousedown', '.day-col', function (e) {
-                    if ($(e.target).closest('.event-card').length > 0) return;
+
+                // 1. Resize Start
+                $(document).on('mousedown', '.resize-handle', function(e) {
                     e.preventDefault();
+                    e.stopPropagation();
+                    var card = $(this).closest('.event-card');
+                    var dayCol = card.closest('.day-col');
+                    
+                    dragMode = 'resize';
+                    dragData = {
+                        card: card,
+                        dayCol: dayCol,
+                        startY: e.clientY,
+                        originalHeight: card.height(),
+                        id: card.data('id'),
+                        resId: card.data('resource-id'),
+                        startMs: card.data('start-ms'),
+                        endMs: card.data('end-ms'),
+                        dayKey: dayCol.data('date')
+                    };
+                    isDragging = true;
+                    _weekViewWasDragging = true;
+                });
+
+                // 2. Move Start (Clicking body of card)
+                $(document).on('mousedown', '.event-card', function(e) {
+                    // Ignore if clicked on delete icon or resize handle (handled above)
+                    if ($(e.target).hasClass('delete-icon') || $(e.target).hasClass('resize-handle')) return;
+                    
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    var card = $(this);
+                    var dayCol = card.closest('.day-col');
+                    var rect = card[0].getBoundingClientRect();
+
+                    dragMode = 'move';
+                    dragData = {
+                        card: card,
+                        originalCol: dayCol,
+                        offsetY: e.clientY - rect.top, // Click offset within card
+                        originalTop: parseFloat(card.css('top')),
+                        id: card.data('id'),
+                        resId: card.data('resource-id'),
+                        duration: card.data('end-ms') - card.data('start-ms'),
+                        startMs: card.data('start-ms')
+                    };
+                    
+                    // Clone card for ghost
+                    card.addClass('dragging'); // Hide original visually
+                    dragGhost = card.clone().removeClass('dragging').addClass('drag-ghost').css({
+                         width: dayCol.width() + 'px',
+                         zIndex: 1000
+                    });
+                    dayCol.append(dragGhost);
+                    
+                    isDragging = true;
+                    _weekViewWasDragging = true;
+                    
+                    // Tooltip
+                    if ($('.drag-tooltip').length === 0) {
+                        dragTooltip = $('<div class="drag-tooltip"></div>');
+                        $('body').append(dragTooltip);
+                    } else { dragTooltip = $('.drag-tooltip'); }
+                });
+
+
+                // 3. Create Start (Clicking empty space)
+                $(document).on('mousedown', '.day-col', function (e) {
+                    if ($(e.target).closest('.event-card').length > 0) return; // Handled by Move/Resize
+                    e.preventDefault();
+
                     var col = $(this);
                     var rect = this.getBoundingClientRect();
                     var offsetY = e.clientY - rect.top;
-                    var dayKey = col.data('date') || col.attr('data-date');
-                    var resId = col.data('resource-id') || col.attr('data-resource-id');
+                    var dayKey = col.data('date');
+                    var resId = col.data('resource-id');
+
                     if (!dayKey) return;
-                    dragStartData = { col: col, startY: offsetY, dayKey: dayKey, resId: resId };
-                    isDragging = false;
+
+                    dragMode = 'create';
+                    dragData = { col: col, startY: offsetY, dayKey: dayKey, resId: resId };
+                    isDragging = false; // Wait for move
                     _weekViewWasDragging = false;
+                    
                     $('.drag-tooltip').remove();
                     dragTooltip = null;
                 });
+
+                // --- Global Mouse Move ---
                 $(document).on('mousemove.weekview', function (e) {
-                    if (!dragStartData) return;
-                    var col = dragStartData.col;
-                    var rect = col[0].getBoundingClientRect();
-                    var currentY = e.clientY - rect.top;
-                    if (!isDragging && Math.abs(currentY - dragStartData.startY) > 5) {
-                        isDragging = true;
-                        if ($('.drag-ghost').length === 0) {
-                            dragGhost = $('<div class="drag-ghost"></div>');
-                            col.append(dragGhost);
-                        } else { dragGhost = $('.drag-ghost'); }
-                        if ($('.drag-tooltip').length === 0) {
-                            dragTooltip = $('<div class="drag-tooltip"></div>');
-                            $('body').append(dragTooltip);
-                        } else { dragTooltip = $('.drag-tooltip'); }
+                    if (!dragData) return;
+
+                    // A. Create Logic (Existing)
+                    if (dragMode === 'create') {
+                         var col = dragData.col;
+                         var rect = col[0].getBoundingClientRect();
+                         var currentY = e.clientY - rect.top;
+
+                         if (!isDragging && Math.abs(currentY - dragData.startY) > 5) {
+                             isDragging = true;
+                             if ($('.drag-ghost').length === 0) {
+                                 dragGhost = $('<div class="drag-ghost"></div>');
+                                 col.append(dragGhost);
+                             } else { dragGhost = $('.drag-ghost'); }
+                             
+                             if ($('.drag-tooltip').length === 0) {
+                                dragTooltip = $('<div class="drag-tooltip"></div>');
+                                $('body').append(dragTooltip);
+                             } else { dragTooltip = $('.drag-tooltip'); }
+                         }
+
+                         if (isDragging) {
+                            var top = Math.min(dragData.startY, currentY);
+                            var height = Math.abs(currentY - dragData.startY);
+                            dragGhost.css({ top: top + 'px', height: height + 'px' });
+
+                            var startY = Math.min(dragData.startY, currentY);
+                            var endY = Math.max(dragData.startY, currentY);
+                            if (endY - startY < 10) endY = startY + 10;
+                            
+                            var start = getTimeFromY(startY, dragData.dayKey);
+                            var end = getTimeFromY(endY, dragData.dayKey);
+                            start = snapTo30(start);
+                            end = snapTo30(end);
+                            if (end.getTime() <= start.getTime()) { end = new Date(start.getTime() + 30 * 60000); }
+                            
+                            updateTooltip(start, end, e);
+                         }
+                    } 
+                    // B. Resize Logic
+                    else if (dragMode === 'resize') {
+                        var currentHeight = Math.max(15, dragData.originalHeight + (e.clientY - dragData.startY));
+                        dragData.card.css('height', currentHeight + 'px');
+                        
+                        // Calculate new end time for tooltip
+                        var start = new Date(dragData.startMs);
+                        var newDurationMs = (currentHeight / 40.0) * 60 * 60000;
+                        var end = new Date(start.getTime() + newDurationMs);
+                         
+                        // Create tooltip if not exists
+                        if (!dragTooltip) {
+                             dragTooltip = $('<div class="drag-tooltip"></div>');
+                             $('body').append(dragTooltip);
+                        }
+                        // Snap end for tooltip display (backend will snap on save?) 
+                        // Visual snap 
+                        var endSnap = new Date(end.getTime());
+                        snapTo30(endSnap);
+
+                        updateTooltip(start, endSnap, e);
                     }
-                    if (isDragging) {
-                        var top = Math.min(dragStartData.startY, currentY);
-                        var height = Math.abs(currentY - dragStartData.startY);
-                        dragGhost.css({ top: top + 'px', height: height + 'px' });
-                        var startY = Math.min(dragStartData.startY, currentY);
-                        var endY = Math.max(dragStartData.startY, currentY);
-                        if (endY - startY < 10) endY = startY + 10;
-                        var start = getTimeFromY(startY, dragStartData.dayKey);
-                        var end = getTimeFromY(endY, dragStartData.dayKey);
-                        start = snapTo30(start);
-                        end = snapTo30(end);
-                        if (end.getTime() <= start.getTime()) { end = new Date(start.getTime() + 30 * 60000); }
-                        var timeStr = formatTime(start) + ' - ' + formatTime(end);
-                        var durStr = '(' + formatDuration(end - start) + ')';
-                        dragTooltip.text(timeStr + ' ' + durStr);
-                        dragTooltip.css({ top: (e.clientY - 40) + 'px', left: (e.clientX + 15) + 'px' });
+                    // C. Move Logic
+                    else if (dragMode === 'move') {
+                        // Identify column under mouse
+                        var elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+                        var targetCol = $(elemBelow).closest('.day-col');
+                        
+                        // If over a valid column, snap ghost to that column
+                        if (targetCol.length > 0) {
+                             if (!dragGhost.parent().is(targetCol)) {
+                                 dragGhost.appendTo(targetCol);
+                                 dragGhost.css('width', targetCol.width() + 'px');
+                             }
+                             var colRect = targetCol[0].getBoundingClientRect();
+                             var newY = e.clientY - colRect.top - dragData.offsetY;
+                             newY = Math.max(0, newY); // Clamp top
+                             
+                             dragGhost.css('top', newY + 'px');
+                             
+                             // Calculate new time
+                             var dayKey = targetCol.data('date');
+                             var start = getTimeFromY(newY, dayKey);
+                             snapTo30(start);
+                             
+                             var end = new Date(start.getTime() + dragData.duration);
+                             
+                             updateTooltip(start, end, e);
+                        }
                     }
                 });
+
+                function updateTooltip(start, end, e) {
+                     if (!dragTooltip) return;
+                     var timeStr = formatTime(start) + ' - ' + formatTime(end);
+                     var durStr = '(' + formatDuration(end - start) + ')';
+                     dragTooltip.text(timeStr + ' ' + durStr);
+                     dragTooltip.css({ top: (e.clientY - 40) + 'px', left: (e.clientX + 15) + 'px' });
+                }
+
+                // --- Global Mouse Up ---
                 $(document).on('mouseup.weekview', function (e) {
-                    if (!dragStartData) return;
-                    if (isDragging) {
-                        var col = dragStartData.col;
+                    if (!dragMode) return;
+                    
+                    $('.drag-tooltip').remove();
+                    dragTooltip = null;
+
+                    if (dragMode === 'create' && isDragging) {
+                         // ... Existing Create Logic ...
+                        var col = dragData.col;
                         var rect = col[0].getBoundingClientRect();
                         var currentY = e.clientY - rect.top;
-                        var startY = Math.min(dragStartData.startY, currentY);
-                        var endY = Math.max(dragStartData.startY, currentY);
+                        
+                        var startY = Math.min(dragData.startY, currentY);
+                        var endY = Math.max(dragData.startY, currentY);
                         if (endY - startY < 10) endY = startY + 10;
-                        var start = getTimeFromY(startY, dragStartData.dayKey);
-                        var end = getTimeFromY(endY, dragStartData.dayKey);
+
+                        var start = getTimeFromY(startY, dragData.dayKey);
+                        var end = getTimeFromY(endY, dragData.dayKey);
                         start = snapTo30(start);
                         end = snapTo30(end);
                         if (end.getTime() <= start.getTime()) { end = new Date(start.getTime() + 30 * 60000); }
+
                         if (window.openCustomAddDialogRange) {
-                            window.openCustomAddDialogRange(start.getTime(), end.getTime(), dragStartData.resId);
+                            window.openCustomAddDialogRange(start.getTime(), end.getTime(), dragData.resId);
                         }
                         $('.drag-ghost').remove();
                         dragGhost = null;
-                        _weekViewWasDragging = true;
+
+                    } else if (dragMode === 'resize') {
+                        // Calculate final time
+                        var card = dragData.card;
+                        var currentHeight = card.height(); // Should be updated by mousemove
+                        
+                        var start = new Date(dragData.startMs);
+                        var newDurationMs = (currentHeight / 40.0) * 60 * 60000;
+                        var end = new Date(start.getTime() + newDurationMs);
+                        snapTo30(end); // Snap end time
+                        
+                        // Prevent 0 duration
+                        if (end.getTime() <= start.getTime()) {
+                             end = new Date(start.getTime() + 30*60000);
+                        }
+
+                        // Trigger Update
+                        triggerUpdate(dragData.id, dragData.resId, start, end);
+
+                    } else if (dragMode === 'move') {
+                        dragData.card.removeClass('dragging');
+                        $('.drag-ghost').remove();
+                        dragGhost = null;
+                        
+                        // Calculate final time based on where mouse is
+                        var elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+                        var targetCol = $(elemBelow).closest('.day-col');
+                        
+                         if (targetCol.length > 0) {
+                             var colRect = targetCol[0].getBoundingClientRect();
+                             var newY = e.clientY - colRect.top - dragData.offsetY;
+                             newY = Math.max(0, newY);
+                             
+                             var dayKey = targetCol.data('date');
+                             var newResId = targetCol.data('resource-id');
+                             
+                             var start = getTimeFromY(newY, dayKey);
+                             snapTo30(start);
+                             
+                             var end = new Date(start.getTime() + dragData.duration);
+                             
+                             // Trigger Update
+                             triggerUpdate(dragData.id, newResId, start, end);
+                         }
                     }
-                    $('.drag-tooltip').remove();
-                    dragTooltip = null;
-                    dragStartData = null;
+
+                    // Reset
+                    dragMode = null;
+                    dragData = null;
                     isDragging = false;
                     setTimeout(function () { _weekViewWasDragging = false; }, 100);
                 });
+                
+                function triggerUpdate(s_booking_id, group, start, end) {
+                     console.log("Updating Booking: " + s_booking_id + " to " + start.toLocaleString() + " - " + end.toLocaleString());
+                     
+                     var item = {
+                         s_booking_id: String(s_booking_id),
+                         group: String(group),
+                         startTimestamp: String(start.getTime()),
+                         endTimestamp: String(end.getTime())
+                     };
+                     
+                     // Use ZK widgets to send data
+                      var itemDataWidget = zk.Widget.$('$itemData'); // Reuse itemData
+                      var dateLastWidget = zk.Widget.$('$dateLast'); // Use dateLast as trigger for updates
+                      
+                      if (itemDataWidget && dateLastWidget) {
+                           itemDataWidget.setValue(JSON.stringify(item));
+                           itemDataWidget.fireOnChange();
+                           dateLastWidget.setValue(Date.now().toString());
+                           dateLastWidget.fireOnChange();
+                      } else {
+                          console.error("ZK Widgets not found!");
+                      }
+                }
             }
             initDragEvents();
         })();

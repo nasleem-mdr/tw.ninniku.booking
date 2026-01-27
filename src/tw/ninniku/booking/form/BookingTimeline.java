@@ -145,8 +145,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			int s_recource_id = Integer.valueOf((String) json.get("group"));
 			if (!updateBooking(S_Booking_ID, s_recource_id, ds, de)) {
 				Clients.showNotification("Time overlap, update failed.");
-				refreshView();
 			}
+			refreshView();
 
 		} else if (event.getTarget().getId().equals("bookingUpdated")) {
 			// MQTT.thread(new MQTT.TimelineProducer("TIMELINE", "RAY"), false);
@@ -780,8 +780,12 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 					html.append(String.format(
 							"<div class='event-card' style='top:%.1fpx; height:%.1fpx; background-color:%s; width:%.1f%%; left:%.1f%%;' "
-									+ "onclick=\"onWeekEventClick(event, '%s', '%s', '%s', '%s', %s, %s);\">%s%s</div>",
-							top, height, color, width, left, b.getS_ResourceAssignment_ID(), nameJS, descJS,
+									+ "data-id='%d' data-resource-id='%d' data-start-ms='%d' data-end-ms='%d' "
+									+ "onclick=\"onWeekEventClick(event, '%s', '%s', '%s', '%s', %s, %s);\">"
+									+ "%s%s<div class='resize-handle'></div></div>", // Added resize-handle
+							top, height, color, width, left,
+							b.getS_ResourceAssignment_ID(), b.getS_Resource_ID(), startMs, endMs, // New data args
+							b.getS_ResourceAssignment_ID(), nameJS, descJS,
 							b.getS_Resource_ID(), startMs, endMs, displayContent, deleteIconHtml));
 				}
 			}
