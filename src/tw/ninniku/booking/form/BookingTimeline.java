@@ -55,7 +55,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private static final long serialVersionUID = 1L;
 	private ArrayList<Group> groups;
-	String version = "3.10";
+	String version = "3.20";
 	Textbox dateStart;
 	Textbox dateEnd;
 	Textbox dateLast;
@@ -777,9 +777,10 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 								+ "</span>";
 					}
 
-					// Delete Icon Logic
+					// Deletion Logic (reuses the same permission for now, or can be distinct)
+					boolean isOwnerOrAdmin = canWrite || b.getCreatedBy() == adUserId;
 					String deleteIconHtml = "";
-					if (canWrite || b.getCreatedBy() == adUserId) {
+					if (isOwnerOrAdmin) {
 						deleteIconHtml = String.format(
 								"<span class='delete-icon' onclick='window.onWeekEventDelete(event, %d)'>&times;</span>",
 								b.getS_ResourceAssignment_ID());
@@ -787,22 +788,24 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 					// Encode strictly for JS string
 					String nameJS = b.getName().replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"");
-					// Description often has newlines; replace them to avoid breaking JS string
 					String descJS = "";
 					if (b.getDescription() != null) {
 						descJS = b.getDescription().replace("\r", "").replace("\n", " ").replace("\\", "\\\\")
 								.replace("'", "\\'").replace("\"", "\\\"");
 					}
 
+					String editableClass = isOwnerOrAdmin ? "editable" : "";
+					String resizeHandleHtml = isOwnerOrAdmin ? "<div class='resize-handle'></div>" : "";
+
 					html.append(String.format(
-							"<div class='event-card' style='top:%.1fpx; height:%.1fpx; background-color:%s; width:%.1f%%; left:%.1f%%;' "
+							"<div class='event-card %s' style='top:%.1fpx; height:%.1fpx; background-color:%s; width:%.1f%%; left:%.1f%%;' "
 									+ "data-id='%d' data-resource-id='%d' data-start-ms='%d' data-end-ms='%d' "
 									+ "onclick=\"onWeekEventClick(event, '%s', '%s', '%s', '%s', %s, %s);\">"
-									+ "%s%s<div class='resize-handle'></div></div>", // Added resize-handle
-							top, height, color, width, left,
-							b.getS_ResourceAssignment_ID(), b.getS_Resource_ID(), startMs, endMs, // New data args
+									+ "%s%s%s</div>", // %s for resize handle
+							editableClass, top, height, color, width, left,
+							b.getS_ResourceAssignment_ID(), b.getS_Resource_ID(), startMs, endMs,
 							b.getS_ResourceAssignment_ID(), nameJS, descJS,
-							b.getS_Resource_ID(), startMs, endMs, displayContent, deleteIconHtml));
+							b.getS_Resource_ID(), startMs, endMs, displayContent, deleteIconHtml, resizeHandleHtml));
 				}
 			}
 

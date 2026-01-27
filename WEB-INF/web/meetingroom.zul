@@ -45,6 +45,8 @@
 .days-grid { flex: 1; display: flex; position: relative; }
 .day-col { flex: 1; border-right: 1px solid #eee; position: relative; height: 100%; background: repeating-linear-gradient(to bottom, transparent 0, transparent 39px, #f5f5f5 40px); cursor: pointer; }
 .event-card { position: absolute; font-size: 11px; color: white; border-radius: 3px; padding: 2px 4px; overflow: hidden; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); z-index: 10; cursor: pointer; }
+.event-card.editable { cursor: grab; }
+.event-card.editable:active { cursor: grabbing; }
 .drag-ghost { position: absolute; background: rgba(33, 150, 243, 0.6); border: 2px solid #1565C0; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); z-index: 100; pointer-events: none; }
 .drag-tooltip { position: fixed; background: rgba(0, 0, 0, 0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 2147483647; white-space: nowrap; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
 .delete-icon { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; line-height: 16px; text-align: center; color: rgba(255, 255, 255, 0.7); font-weight: bold; cursor: pointer; border-radius: 50%; z-index: 20; }
@@ -408,6 +410,9 @@
                 $(document).on('mousedown', '.event-card', function(e) {
                     // Ignore if clicked on delete icon or resize handle (handled above)
                     if ($(e.target).hasClass('delete-icon') || $(e.target).hasClass('resize-handle')) return;
+                    
+                    // Enforce permission: Must have 'editable' class
+                    if (!$(this).hasClass('editable')) return;
                     
                     e.preventDefault();
                     e.stopPropagation();
