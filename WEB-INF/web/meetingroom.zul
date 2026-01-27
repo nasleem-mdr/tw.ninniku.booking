@@ -29,294 +29,232 @@
    <style src="/styles/vis-timeline-graph2d.min.css"/>
     <style src="/styles/jquery-ui.css"/> 
     <style src="/styles/jquery.toast.css"/> 
-    <style src="/styles/booking.css"/> 
-  <style>
-    .drag-tooltip {
-        position: fixed;
-        background: rgba(0, 0, 0, 0.8);
-        color: white;
-        padding: 4px 8px;
-        border-radius: 4px;
-        font-size: 12px;
-        pointer-events: none;
-        z-index: 2147483647;
-        white-space: nowrap;
-        box-shadow: 0 2px 10px rgba(0,0,0,0.5);
-    }
-  </style>
-<n:script xmlns:n="native">
-<![CDATA[
-// Fallback: Define global functions here in case booking.js is cached/stale
-window.openCustomAddDialog = function (dateStr, minutesOffset, resourceId) {
-	if (!resourceId) {
-		resourceId = (groups && groups.length > 0) ? groups[0].id : 0;
-	}
-	var date = new Date(dateStr);
-	date.setMinutes(date.getMinutes() + minutesOffset);
-	var endDate = new Date(date);
-	endDate.setHours(endDate.getHours() + 1);
-	var item = { start: date, end: endDate, group: resourceId, content: '' };
-	if(typeof clickNew === 'function') clickNew(item, function(){});
-    else console.error("clickNew not defined");
-};
+    <style src="/styles/booking.css?version=${uuid}"/>
+    <style>
+/* Week View Styles Inlined for Reliability */
+.week-view-root { font-family: 'Roboto', sans-serif; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.week-header { display: flex; height: 40px; border-bottom: 2px solid #ddd; background: #f5f5f5; flex-shrink: 0; }
+.header-time-spacer { width: 60px; min-width: 60px; border-right: 1px solid #eee; background: #f9f9f9; }
+.header-day { flex: 1; text-align: center; line-height: 40px; font-weight: bold; font-size: 13px; color: #444; border-right: 1px solid #eee; }
+.scroll-body { flex: 1; overflow-y: auto; position: relative; min-height: 0; display: flex; flex-direction: column; }
+.week-layout { display: flex; flex-direction: row; background: white; border: 1px solid #ddd; min-height: 960px; flex: 1; }
+.time-col { width: 60px; flex-shrink: 0; background: #f8f9fa; border-right: 1px solid #ddd; }
+.time-slot { height: 40px; border-bottom: 1px solid #e0e0e0; font-size: 11px; color: #666; display: flex; align-items: start; justify-content: center; padding-top: 2px; box-sizing: border-box; }
+.days-grid { flex: 1; display: flex; position: relative; }
+.day-col { flex: 1; border-right: 1px solid #eee; position: relative; height: 960px; background: repeating-linear-gradient(to bottom, transparent 0, transparent 39px, #f5f5f5 40px); cursor: pointer; }
+.event-card { position: absolute; font-size: 11px; color: white; border-radius: 3px; padding: 2px 4px; overflow: hidden; box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2); z-index: 10; cursor: pointer; }
+.drag-ghost { position: absolute; background: rgba(33, 150, 243, 0.6); border: 2px solid #1565C0; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); z-index: 100; pointer-events: none; }
+.drag-tooltip { position: fixed; background: rgba(0, 0, 0, 0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 2147483647; white-space: nowrap; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
+.delete-icon { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; line-height: 16px; text-align: center; color: rgba(255, 255, 255, 0.7); font-weight: bold; cursor: pointer; border-radius: 50%; z-index: 20; }
+.delete-icon:hover { color: #fff; background-color: rgba(255, 0, 0, 0.7); }
+    </style> 
 
-window.openCustomEditDialog = function (id, name, desc, resourceId, startMs, endMs) {
-	var item = {
-		id: id, s_booking_id: id, name: name, content: name, description: desc,
-		group: resourceId, start: new Date(startMs), end: new Date(endMs)
-	};
-	if(typeof openEditDialog === 'function') openEditDialog(item, function(){});
-};
 
-window.openCustomAddDialogRange = function (startMs, endMs, resourceId) {
-	if (!resourceId) {
-		resourceId = (groups && groups.length > 0) ? groups[0].id : 0;
-	}
-	var start = new Date(startMs);
-	var end = new Date(endMs);
-	var item = { start: start, end: end, group: resourceId, content: '' };
-	if(typeof clickNew === 'function') clickNew(item, function(){});
-    else console.error("clickNew not defined");
-};
+    <!-- Inlined Week View Logic to bypass caching/deployment issues -->
+    <script>
+    <![CDATA[
+        console.log('DEBUG: Inlined Week View Logic Loaded');
 
-var _weekViewWasDragging = false;
-window.onWeekDayClick = function (event, elem, dayKey, resourceId) {
-	if (_weekViewWasDragging) { _weekViewWasDragging = false; return; }
-	var rect = elem.getBoundingClientRect();
-	var min = (event.clientY - rect.top) / 40 * 60;
-	if (window.openCustomAddDialog) window.openCustomAddDialog(dayKey, min, resourceId);
-};
-
-window.onWeekEventClick = function (event, id, name, desc, resId, startMs, endMs) {
-	event.stopPropagation();
-	if (window.openCustomEditDialog) window.openCustomEditDialog(id, name, desc, resId, startMs, endMs);
-};
-
-window.weekViewScrollTo8Am = function () {
-	setTimeout(function () {
-		var el = document.querySelector('.scroll-body');
-		if (el) el.scrollTop = 320;
-	}, 200);
-};
-
-window.onWeekEventDelete = function (event, id) {
-    event.stopPropagation();
-    if (confirm('Are you sure you want to delete this booking?')) {
-        // Find ZK widgets for hidden fields
-        var itemDataWidget = zk.Widget.$('$itemData');
-        var boookingDeletedWidget = zk.Widget.$('$bookingDeleted');
-        
-        var json = JSON.stringify({id: String(id)});
-        
-        if (itemDataWidget && boookingDeletedWidget) {
-            itemDataWidget.setValue(json);
-            itemDataWidget.fireOnChange();
+        window.openCustomAddDialog = function (dateStr, minutesOffset, resourceId) {
+            if (!resourceId) {
+                resourceId = (window.groups && window.groups.length > 0) ? window.groups[0].id : 0;
+            }
+            var date = new Date(dateStr);
+            date.setMinutes(date.getMinutes() + minutesOffset);
+            var endDate = new Date(date);
+            endDate.setHours(endDate.getHours() + 1);
+            var item = { start: date, end: endDate, group: resourceId, content: '' };
             
-            boookingDeletedWidget.setValue('DELETE-' + id);
-            boookingDeletedWidget.fireOnChange();
-        } else {
-            // JQuery Fallback
-             var $ = window.$ || window.jQuery || window.jq;
-             $('#itemData').val(json).trigger('change');
-             $('#bookingDeleted').val('DELETE-' + id).trigger('change');
-        }
-    }
-};
+            if (typeof window.clickNew === 'function') {
+                window.clickNew(item, function () { });
+            } else {
+                console.error("clickNew not defined - check booking.js");
+                alert("Core booking function 'clickNew' is missing. Please refresh or contact support.");
+            }
+        };
 
-// --- Drag and Drop Logic (Inline Fallback) ---
-(function () {
-    var $ = window.$ || window.jQuery || window.jq;
-	// Helper to get time from Y coordinate relative to day-col
-	function getTimeFromY(y, dayKey) {
-		// 40px = 60 mins -> 1px = 1.5 mins
-		var mins = (y / 40) * 60;
-		// Force local time parsing
-		var date = new Date(dayKey + 'T00:00:00');
-		date.setMinutes(date.getMinutes() + mins);
-		return date;
-	}
+        window.openCustomEditDialog = function (id, name, desc, resourceId, startMs, endMs) {
+            var item = {
+                id: id, s_booking_id: id, name: name, content: name, description: desc,
+                group: resourceId, start: new Date(startMs), end: new Date(endMs)
+            };
+            if (typeof window.openEditDialog === 'function') window.openEditDialog(item, function () { });
+        };
 
-	var dragStartData = null;
-	var dragGhost = null;
-    var dragTooltip = null;
-	var isDragging = false;
+        window.openCustomAddDialogRange = function (startMs, endMs, resourceId) {
+            if (!resourceId) {
+                resourceId = (window.groups && window.groups.length > 0) ? window.groups[0].id : 0;
+            }
+            var start = new Date(startMs);
+            var end = new Date(endMs);
+            var item = { start: start, end: end, group: resourceId, content: '' };
+            if (typeof window.clickNew === 'function') window.clickNew(item, function () { });
+            else console.error("clickNew not defined");
+        };
 
-    // Helper: Round date to nearest 30 minutes
-    function snapTo30(d) {
-        var m = d.getMinutes();
-        var r = Math.round(m / 30) * 30;
-        d.setMinutes(r, 0, 0);
-        return d;
-    }
+        var _weekViewWasDragging = false;
+        window.onWeekDayClick = function (event, elem, dayKey, resourceId) {
+            if (_weekViewWasDragging) { _weekViewWasDragging = false; return; }
+            var rect = elem.getBoundingClientRect();
+            var min = (event.clientY - rect.top) / 40 * 60;
+            if (window.openCustomAddDialog) window.openCustomAddDialog(dayKey, min, resourceId);
+        };
 
-    // Helper: Format time as HH:mm
-    function formatTime(date) {
-        var h = date.getHours();
-        var m = date.getMinutes();
-        return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
-    }
+        window.onWeekEventClick = function (event, id, name, desc, resId, startMs, endMs) {
+            event.stopPropagation();
+            if (window.openCustomEditDialog) window.openCustomEditDialog(id, name, desc, resId, startMs, endMs);
+        };
 
-    // Helper: Format duration
-    function formatDuration(diffMs) {
-        var diffMins = Math.round(diffMs / 60000);
-        var h = Math.floor(diffMins / 60);
-        var m = diffMins % 60;
-        var str = '';
-        if (h > 0) str += h + 'h ';
-        if (m > 0 || h === 0) str += m + 'm';
-        return str.trim();
-    }
+        window.weekViewScrollTo8Am = function () {
+            setTimeout(function () {
+                var el = document.querySelector('.scroll-body');
+                if (el) el.scrollTop = 320;
+            }, 200);
+        };
 
-	function initDragEvents() {
-        $ = window.$ || window.jQuery || window.jq;
-		if (typeof $ === 'undefined') {
-			setTimeout(initDragEvents, 100);
-			return;
-		}
+        window.onWeekEventDelete = function (event, id) {
+            event.stopPropagation();
+            if (confirm('Are you sure you want to delete this booking?')) {
+                var itemDataWidget = zk.Widget.$('$itemData');
+                var boookingDeletedWidget = zk.Widget.$('$bookingDeleted');
+                var json = JSON.stringify({ id: String(id) });
 
-		// Unbind first to avoid duplicates
-		$(document).off('mousedown', '.day-col');
-		$(document).off('mousemove.weekview');
-		$(document).off('mouseup.weekview');
-
-		$(document).on('mousedown', '.day-col', function (e) {
-			if ($(e.target).closest('.event-card').length > 0) return;
-			e.preventDefault();
-
-			var col = $(this);
-			var rect = this.getBoundingClientRect();
-			var offsetY = e.clientY - rect.top;
-
-			var dayKey = col.data('date') || col.attr('data-date');
-			var resId = col.data('resource-id') || col.attr('data-resource-id');
-
-			if (!dayKey) return;
-
-			dragStartData = {
-				col: col,
-				startY: offsetY,
-				dayKey: dayKey,
-				resId: resId
-			};
-			isDragging = false;
-            _weekViewWasDragging = false;
-            
-            // Remove existing tooltip if any
-            $('.drag-tooltip').remove();
-            dragTooltip = null;
-		});
-
-		$(document).on('mousemove.weekview', function (e) {
-			if (!dragStartData) return;
-
-			var col = dragStartData.col;
-			var rect = col[0].getBoundingClientRect();
-			var currentY = e.clientY - rect.top;
-
-			if (!isDragging && Math.abs(currentY - dragStartData.startY) > 5) {
-				isDragging = true;
-				// Create Ghost
-				if($('.drag-ghost').length === 0) {
-    				dragGhost = $('<div class="drag-ghost"></div>');
-    				col.append(dragGhost);
+                if (itemDataWidget && boookingDeletedWidget) {
+                    itemDataWidget.setValue(json);
+                    itemDataWidget.fireOnChange();
+                    boookingDeletedWidget.setValue('DELETE-' + id);
+                    boookingDeletedWidget.fireOnChange();
                 } else {
-                    dragGhost = $('.drag-ghost');
+                    var $ = window.$ || window.jQuery || window.jq;
+                    $('#itemData').val(json).trigger('change');
+                    $('#bookingDeleted').val('DELETE-' + id).trigger('change');
                 }
-                
-                // Create Tooltip
-                if ($('.drag-tooltip').length === 0) {
-                    dragTooltip = $('<div class="drag-tooltip"></div>');
-                    $('body').append(dragTooltip);
-                } else {
-                    dragTooltip = $('.drag-tooltip');
-                }
-			}
+            }
+        };
 
-			if (isDragging) {
-				var top = Math.min(dragStartData.startY, currentY);
-				var height = Math.abs(currentY - dragStartData.startY);
-				dragGhost.css({
-					top: top + 'px',
-					height: height + 'px'
-				});
-                
-                // Calculate Times for Tooltip
-                var startY = Math.min(dragStartData.startY, currentY);
-				var endY = Math.max(dragStartData.startY, currentY);
-                if (endY - startY < 10) endY = startY + 10;
-                
-                var start = getTimeFromY(startY, dragStartData.dayKey);
-				var end = getTimeFromY(endY, dragStartData.dayKey);
-                
-                start = snapTo30(start);
-                end = snapTo30(end);
-                 
-                if (end.getTime() <= start.getTime()) {
-                    end = new Date(start.getTime() + 30 * 60000);
+        /* Drag and Drop Logic */
+        (function () {
+            var $ = window.$ || window.jQuery || window.jq;
+            function getTimeFromY(y, dayKey) {
+                var mins = (y / 40) * 60;
+                var date = new Date(dayKey + 'T00:00:00');
+                date.setMinutes(date.getMinutes() + mins);
+                return date;
+            }
+            var dragStartData = null;
+            var dragGhost = null;
+            var dragTooltip = null;
+            var isDragging = false;
+            function snapTo30(d) {
+                var m = d.getMinutes();
+                var r = Math.round(m / 30) * 30;
+                d.setMinutes(r, 0, 0);
+                return d;
+            }
+            function formatTime(date) {
+                var h = date.getHours();
+                var m = date.getMinutes();
+                return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
+            }
+            function formatDuration(diffMs) {
+                var diffMins = Math.round(diffMs / 60000);
+                var h = Math.floor(diffMins / 60);
+                var m = diffMins % 60;
+                var str = '';
+                if (h > 0) str += h + 'h ';
+                if (m > 0 || h === 0) str += m + 'm';
+                return str.trim();
+            }
+            function initDragEvents() {
+                $ = window.$ || window.jQuery || window.jq;
+                if (typeof $ === 'undefined') {
+                    setTimeout(initDragEvents, 100);
+                    return;
                 }
-                
-                var timeStr = formatTime(start) + ' - ' + formatTime(end);
-                var durStr = '(' + formatDuration(end - start) + ')';
-                
-                dragTooltip.text(timeStr + ' ' + durStr);
-                
-                // Position tooltip near cursor but not under it
-                dragTooltip.css({
-                    top: (e.clientY - 40) + 'px',
-                    left: (e.clientX + 15) + 'px'
+                $(document).off('mousedown', '.day-col');
+                $(document).off('mousemove.weekview');
+                $(document).off('mouseup.weekview');
+                $(document).on('mousedown', '.day-col', function (e) {
+                    if ($(e.target).closest('.event-card').length > 0) return;
+                    e.preventDefault();
+                    var col = $(this);
+                    var rect = this.getBoundingClientRect();
+                    var offsetY = e.clientY - rect.top;
+                    var dayKey = col.data('date') || col.attr('data-date');
+                    var resId = col.data('resource-id') || col.attr('data-resource-id');
+                    if (!dayKey) return;
+                    dragStartData = { col: col, startY: offsetY, dayKey: dayKey, resId: resId };
+                    isDragging = false;
+                    _weekViewWasDragging = false;
+                    $('.drag-tooltip').remove();
+                    dragTooltip = null;
                 });
-			}
-		});
-
-		$(document).on('mouseup.weekview', function (e) {
-			if (!dragStartData) return;
-
-			if (isDragging) {
-				var col = dragStartData.col;
-				var rect = col[0].getBoundingClientRect();
-				var currentY = e.clientY - rect.top;
-
-				var startY = Math.min(dragStartData.startY, currentY);
-				var endY = Math.max(dragStartData.startY, currentY);
-                
-                // Minimum height check (e.g. 15 mins = 10px)
-                if (endY - startY < 10) endY = startY + 10;
-
-				var start = getTimeFromY(startY, dragStartData.dayKey);
-				var end = getTimeFromY(endY, dragStartData.dayKey);
-
-                start = snapTo30(start);
-                end = snapTo30(end);
-                
-                // Ensure valid duration (min 30 min)
-                if (end.getTime() <= start.getTime()) {
-                    end = new Date(start.getTime() + 30 * 60000);
-                }
-
-				if (window.openCustomAddDialogRange) {
-					window.openCustomAddDialogRange(start.getTime(), end.getTime(), dragStartData.resId);
-				}
-				
-				$('.drag-ghost').remove();
-                dragGhost = null;
-                _weekViewWasDragging = true; // Prevent click event from firing
-			} 
-            
-            // Cleanup
-            $('.drag-tooltip').remove();
-            dragTooltip = null;
-            
-			dragStartData = null;
-			isDragging = false;
-            setTimeout(function(){ _weekViewWasDragging = false; }, 100);
-		});
-	}
-
-	// Start initialization
-	initDragEvents();
-})();
-]]>
-</n:script>
+                $(document).on('mousemove.weekview', function (e) {
+                    if (!dragStartData) return;
+                    var col = dragStartData.col;
+                    var rect = col[0].getBoundingClientRect();
+                    var currentY = e.clientY - rect.top;
+                    if (!isDragging && Math.abs(currentY - dragStartData.startY) > 5) {
+                        isDragging = true;
+                        if ($('.drag-ghost').length === 0) {
+                            dragGhost = $('<div class="drag-ghost"></div>');
+                            col.append(dragGhost);
+                        } else { dragGhost = $('.drag-ghost'); }
+                        if ($('.drag-tooltip').length === 0) {
+                            dragTooltip = $('<div class="drag-tooltip"></div>');
+                            $('body').append(dragTooltip);
+                        } else { dragTooltip = $('.drag-tooltip'); }
+                    }
+                    if (isDragging) {
+                        var top = Math.min(dragStartData.startY, currentY);
+                        var height = Math.abs(currentY - dragStartData.startY);
+                        dragGhost.css({ top: top + 'px', height: height + 'px' });
+                        var startY = Math.min(dragStartData.startY, currentY);
+                        var endY = Math.max(dragStartData.startY, currentY);
+                        if (endY - startY < 10) endY = startY + 10;
+                        var start = getTimeFromY(startY, dragStartData.dayKey);
+                        var end = getTimeFromY(endY, dragStartData.dayKey);
+                        start = snapTo30(start);
+                        end = snapTo30(end);
+                        if (end.getTime() <= start.getTime()) { end = new Date(start.getTime() + 30 * 60000); }
+                        var timeStr = formatTime(start) + ' - ' + formatTime(end);
+                        var durStr = '(' + formatDuration(end - start) + ')';
+                        dragTooltip.text(timeStr + ' ' + durStr);
+                        dragTooltip.css({ top: (e.clientY - 40) + 'px', left: (e.clientX + 15) + 'px' });
+                    }
+                });
+                $(document).on('mouseup.weekview', function (e) {
+                    if (!dragStartData) return;
+                    if (isDragging) {
+                        var col = dragStartData.col;
+                        var rect = col[0].getBoundingClientRect();
+                        var currentY = e.clientY - rect.top;
+                        var startY = Math.min(dragStartData.startY, currentY);
+                        var endY = Math.max(dragStartData.startY, currentY);
+                        if (endY - startY < 10) endY = startY + 10;
+                        var start = getTimeFromY(startY, dragStartData.dayKey);
+                        var end = getTimeFromY(endY, dragStartData.dayKey);
+                        start = snapTo30(start);
+                        end = snapTo30(end);
+                        if (end.getTime() <= start.getTime()) { end = new Date(start.getTime() + 30 * 60000); }
+                        if (window.openCustomAddDialogRange) {
+                            window.openCustomAddDialogRange(start.getTime(), end.getTime(), dragStartData.resId);
+                        }
+                        $('.drag-ghost').remove();
+                        dragGhost = null;
+                        _weekViewWasDragging = true;
+                    }
+                    $('.drag-tooltip').remove();
+                    dragTooltip = null;
+                    dragStartData = null;
+                    isDragging = false;
+                    setTimeout(function () { _weekViewWasDragging = false; }, 100);
+                });
+            }
+            initDragEvents();
+        })();
+    ]]>
+    </script>
 
 
 

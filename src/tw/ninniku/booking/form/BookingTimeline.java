@@ -12,6 +12,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 import java.text.SimpleDateFormat;
 import java.util.Collections;
 import java.util.Comparator;
@@ -265,8 +266,20 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			trx.start();
 
 			MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id, trx.getTrxName());
-			booking.setDescription(json.get("description").toString());
-			booking.setName(json.get("booking-name").toString());
+			String name = json.optString("booking-name", "").trim();
+			String description = json.optString("description", "").trim();
+
+			if (name.isEmpty()) {
+				errorMessage = "Subject (Name) is required.";
+				return false;
+			}
+			if (description.isEmpty()) {
+				errorMessage = "Memo (Description) is required.";
+				return false;
+			}
+
+			booking.setDescription(description);
+			booking.setName(name);
 			booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
 			booking.setAssignDateFrom(new Timestamp(Long.valueOf((String) json.get("assign-date-from-timestamp"))));
 			booking.setAssignDateTo(new Timestamp(Long.valueOf((String) json.get("assign-date-to-timestamp"))));
@@ -307,8 +320,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				while (calendarFrom.before(calendarEnd)) {
 
 					booking = new MResourceAssignment(Env.getCtx(), 0, trx.getTrxName());
-					booking.setDescription(json.get("description").toString());
-					booking.setName(json.get("booking-name").toString());
+					booking.setDescription(description);
+					booking.setName(name);
 					booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
 
 					booking.setAssignDateFrom(new Timestamp(calendarFrom.getTimeInMillis()));
@@ -336,6 +349,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			trx.commit();
 		} catch (Exception e) {
 			ok = false;
+			errorMessage = "Error saving booking: " + e.getMessage();
 			trx.rollback();
 		} finally {
 			// Close the transaction
@@ -354,6 +368,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	}
 
 	private boolean updateBooking(int s_Booking_ID, int groupID, Timestamp ds, Timestamp de) {
+		if (s_Booking_ID <= 0)
+			return false; // Cannot update a non-existent booking, prevents NULL Name error on insert
+
 		MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), s_Booking_ID, null);
 
 		booking.setAssignDateFrom(ds);
@@ -384,6 +401,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			Map<String, Object> args = new HashMap<String, Object>();
 			args.put("version", this.version);
 			args.put("labels", labels);
+			args.put("uuid", UUID.randomUUID().toString());
 			component = Executions.createComponents(zulPath, this, args);
 		} finally {
 			Thread.currentThread().setContextClassLoader(cl);
@@ -623,37 +641,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		StringBuilder html = new StringBuilder();
 
-		// Styles
-		html.append("<style>");
-		html.append(
-				".week-view-root { font-family: 'Roboto', sans-serif; height: 100%; display: flex; flex-direction: column; overflow: hidden; }");
-		html.append(
-				".week-header { display: flex; height: 40px; border-bottom: 2px solid #ddd; background: #f5f5f5; flex-shrink: 0; }");
-		html.append(
-				".header-time-spacer { width: 60px; min-width: 60px; border-right: 1px solid #eee; background: #f9f9f9; }");
-		html.append(
-				".header-day { flex: 1; text-align: center; line-height: 40px; font-weight: bold; font-size: 13px; color: #444; border-right: 1px solid #eee; }");
-		html.append(
-				".scroll-body { flex: 1; overflow-y: auto; position: relative; min-height: 0; display:flex; flex-direction:column;}");
-		html.append(
-				".week-layout { display: flex; flex-direction: row; background: white; border: 1px solid #ddd; min-height: 960px; flex:1; }");
-		html.append(".time-col { width: 60px; flex-shrink: 0; background: #f8f9fa; border-right: 1px solid #ddd; }");
-		html.append(
-				".time-slot { height: 40px; border-bottom: 1px solid #e0e0e0; font-size: 11px; color: #666; display: flex; align-items: start; justify-content: center; padding-top: 2px; box-sizing: border-box; }");
-		html.append(".days-grid { flex: 1; display: flex; position: relative; }");
-		html.append(
-				".day-col { flex: 1; border-right: 1px solid #eee; position: relative; height: 960px; background: repeating-linear-gradient(to bottom, transparent 0, transparent 39px, #f5f5f5 40px); cursor: pointer; }");
-		html.append(
-				".event-card { position: absolute; font-size: 11px; color: white; border-radius: 3px; padding: 2px 4px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.2); z-index: 10; cursor: pointer; }");
-		html.append(
-				".drag-ghost { position: absolute; background: rgba(33, 150, 243, 0.6); border: 2px solid #1565C0; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 100; pointer-events: none; }");
-		html.append(
-				".drag-tooltip { position: fixed; background: rgba(0, 0, 0, 0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 2147483647; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }");
-		html.append(
-				".delete-icon { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; line-height: 16px; text-align: center; color: rgba(255,255,255,0.7); font-weight: bold; cursor: pointer; border-radius: 50%; z-index: 20; }");
-		html.append(
-				".delete-icon:hover { color: #fff; background-color: rgba(255,0,0,0.7); }");
-		html.append("</style>");
+		// CSS is handled in booking.css
 
 		html.append("<div class='week-view-root'>");
 

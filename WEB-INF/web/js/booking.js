@@ -5,88 +5,9 @@
 var isload = false;
 console.log('booking.js loaded - v3 Check');
 // Global functions for custom views
-window.openCustomAddDialog = function (dateStr, minutesOffset, resourceId) {
-	if (!resourceId) {
-		resourceId = (groups && groups.length > 0) ? groups[0].id : 0;
-	}
 
-	var date = new Date(dateStr);
-	// Add minutes offset to get precise start time
-	date.setMinutes(date.getMinutes() + minutesOffset);
 
-	var endDate = new Date(date);
-	endDate.setHours(endDate.getHours() + 1);
-
-	var item = {
-		start: date,
-		end: endDate,
-		group: resourceId,
-		content: ''
-	};
-	clickNew(item, null);
-};
-
-window.openCustomEditDialog = function (id, name, desc, resourceId, startMs, endMs) {
-	var item = {
-		id: id,
-		s_booking_id: id,
-		name: name,
-		content: name,
-		description: desc,
-		group: resourceId,
-		start: new Date(startMs),
-		end: new Date(endMs)
-	};
-	openEditDialog(item, null);
-};
-
-window.openCustomAddDialogRange = function (startMs, endMs, resourceId) {
-	if (!resourceId) {
-		resourceId = (groups && groups.length > 0) ? groups[0].id : 0;
-	}
-
-	var start = new Date(startMs);
-	var end = new Date(endMs);
-
-	var item = {
-		start: start,
-		end: end,
-		group: resourceId,
-		content: ''
-	};
-	clickNew(item, null);
-};
-
-// Global flag for drag state
-var _weekViewWasDragging = false;
-
-window.onWeekDayClick = function (event, elem, dayKey, resourceId) {
-	if (_weekViewWasDragging) {
-		_weekViewWasDragging = false; // Reset
-		return;
-	}
-
-	// Original Click Logic
-	var rect = elem.getBoundingClientRect();
-	var min = (event.clientY - rect.top) / 40 * 60;
-	if (window.openCustomAddDialog) {
-		window.openCustomAddDialog(dayKey, min, resourceId);
-	}
-};
-
-window.onWeekEventClick = function (event, id, name, desc, resId, startMs, endMs) {
-	event.stopPropagation();
-	if (window.openCustomEditDialog) {
-		window.openCustomEditDialog(id, name, desc, resId, startMs, endMs);
-	}
-};
-
-window.weekViewScrollTo8Am = function () {
-	setTimeout(function () {
-		var el = document.querySelector('.scroll-body');
-		if (el) el.scrollTop = 320;
-	}, 200);
-};
+/* window.weekViewScrollTo8Am moved to booking_weekview.js */
 
 var items;
 var groups;
@@ -335,6 +256,9 @@ function openEditDialog(item, callback) {
 	});
 }
 
+// Expose to window for external access (e.g. from booking_weekview.js)
+window.openEditDialog = openEditDialog;
+
 function clickNew(item, callback) {
 
 	updateMeetingRoomSelector();
@@ -410,64 +334,158 @@ function clickNew(item, callback) {
 	});
 }
 
+// Expose to window for external access
+window.clickNew = clickNew;
+
 
 
 /**
  * Week View Drag and Drop Event Initialization
  */
+/* Week View Logic - Merged from booking_weekview.js for reliability */
+console.log('DEBUG: Start of Merged Week View Logic');
+
+window.openCustomAddDialog = function (dateStr, minutesOffset, resourceId) {
+	console.log('DEBUG: openCustomAddDialog called', dateStr, minutesOffset, resourceId);
+	if (!resourceId) {
+		resourceId = (window.groups && window.groups.length > 0) ? window.groups[0].id : 0;
+	}
+	var date = new Date(dateStr);
+	date.setMinutes(date.getMinutes() + minutesOffset);
+	var endDate = new Date(date);
+	endDate.setHours(endDate.getHours() + 1);
+	var item = { start: date, end: endDate, group: resourceId, content: '' };
+
+	if (typeof window.clickNew === 'function') {
+		window.clickNew(item, function () { });
+	} else {
+		console.error("clickNew not defined");
+	}
+};
+
+window.openCustomEditDialog = function (id, name, desc, resourceId, startMs, endMs) {
+	var item = {
+		id: id, s_booking_id: id, name: name, content: name, description: desc,
+		group: resourceId, start: new Date(startMs), end: new Date(endMs)
+	};
+	if (typeof window.openEditDialog === 'function') window.openEditDialog(item, function () { });
+};
+
+window.openCustomAddDialogRange = function (startMs, endMs, resourceId) {
+	if (!resourceId) {
+		resourceId = (window.groups && window.groups.length > 0) ? window.groups[0].id : 0;
+	}
+	var start = new Date(startMs);
+	var end = new Date(endMs);
+	var item = { start: start, end: end, group: resourceId, content: '' };
+	if (typeof window.clickNew === 'function') window.clickNew(item, function () { });
+	else console.error("clickNew not defined");
+};
+
+var _weekViewWasDragging = false;
+window.onWeekDayClick = function (event, elem, dayKey, resourceId) {
+	if (_weekViewWasDragging) { _weekViewWasDragging = false; return; }
+	var rect = elem.getBoundingClientRect();
+	var min = (event.clientY - rect.top) / 40 * 60;
+	if (window.openCustomAddDialog) window.openCustomAddDialog(dayKey, min, resourceId);
+};
+
+window.onWeekEventClick = function (event, id, name, desc, resId, startMs, endMs) {
+	event.stopPropagation();
+	if (window.openCustomEditDialog) window.openCustomEditDialog(id, name, desc, resId, startMs, endMs);
+};
+
+window.weekViewScrollTo8Am = function () {
+	setTimeout(function () {
+		var el = document.querySelector('.scroll-body');
+		if (el) el.scrollTop = 320;
+	}, 200);
+};
+
+window.onWeekEventDelete = function (event, id) {
+	event.stopPropagation();
+	if (confirm('Are you sure you want to delete this booking?')) {
+		// Find ZK widgets for hidden fields
+		var itemDataWidget = zk.Widget.$('$itemData');
+		var boookingDeletedWidget = zk.Widget.$('$bookingDeleted');
+
+		var json = JSON.stringify({ id: String(id) });
+
+		if (itemDataWidget && boookingDeletedWidget) {
+			itemDataWidget.setValue(json);
+			itemDataWidget.fireOnChange();
+
+			boookingDeletedWidget.setValue('DELETE-' + id);
+			boookingDeletedWidget.fireOnChange();
+		} else {
+			// JQuery Fallback
+			var $ = window.$ || window.jQuery || window.jq;
+			$('#itemData').val(json).trigger('change');
+			$('#bookingDeleted').val('DELETE-' + id).trigger('change');
+		}
+	}
+};
+
+/* Drag and Drop Logic */
 (function () {
-	// Helper to get time from Y coordinate relative to day-col
+	var $ = window.$ || window.jQuery || window.jq;
+
 	function getTimeFromY(y, dayKey) {
-		// 40px = 60 mins -> 1px = 1.5 mins
 		var mins = (y / 40) * 60;
-		var date = new Date(dayKey);
+		var date = new Date(dayKey + 'T00:00:00');
 		date.setMinutes(date.getMinutes() + mins);
 		return date;
 	}
 
 	var dragStartData = null;
 	var dragGhost = null;
+	var dragTooltip = null;
 	var isDragging = false;
 
+	function snapTo30(d) {
+		var m = d.getMinutes();
+		var r = Math.round(m / 30) * 30;
+		d.setMinutes(r, 0, 0);
+		return d;
+	}
+
+	function formatTime(date) {
+		var h = date.getHours();
+		var m = date.getMinutes();
+		return (h < 10 ? '0' + h : h) + ':' + (m < 10 ? '0' + m : m);
+	}
+
+	function formatDuration(diffMs) {
+		var diffMins = Math.round(diffMs / 60000);
+		var h = Math.floor(diffMins / 60);
+		var m = diffMins % 60;
+		var str = '';
+		if (h > 0) str += h + 'h ';
+		if (m > 0 || h === 0) str += m + 'm';
+		return str.trim();
+	}
+
 	function initDragEvents() {
+		$ = window.$ || window.jQuery || window.jq;
 		if (typeof $ === 'undefined') {
 			setTimeout(initDragEvents, 100);
 			return;
 		}
 
-		// Unbind first to avoid duplicates if hot-reloaded
 		$(document).off('mousedown', '.day-col');
 		$(document).off('mousemove.weekview');
 		$(document).off('mouseup.weekview');
 
 		$(document).on('mousedown', '.day-col', function (e) {
 			if ($(e.target).closest('.event-card').length > 0) return;
-
 			e.preventDefault();
 
 			var col = $(this);
 			var rect = this.getBoundingClientRect();
 			var offsetY = e.clientY - rect.top;
 
-			// Use data attributes (safer than onclick parsing)
-			var dayKey = col.data('date'); // jQuery .data() handles type conversion
-			var resId = col.data('resource-id');
-
-			// Fallback to strict string attribute if .data conversion is weird
-			if (!dayKey) dayKey = col.attr('data-date');
-			if (!resId) resId = col.attr('data-resource-id');
-
-			// Fallback for Legacy HTML (if Java build failed)
-			if (!dayKey) {
-				var onClickAttr = col.attr('onclick');
-				if (onClickAttr) {
-					var parts = onClickAttr.split("'");
-					if (parts.length >= 4) {
-						dayKey = parts[3];
-						resId = parts[5];
-					}
-				}
-			}
+			var dayKey = col.data('date') || col.attr('data-date');
+			var resId = col.data('resource-id') || col.attr('data-resource-id');
 
 			if (!dayKey) return;
 
@@ -475,12 +493,12 @@ function clickNew(item, callback) {
 				col: col,
 				startY: offsetY,
 				dayKey: dayKey,
-				resId: resId,
-				startTime: getTimeFromY(offsetY, dayKey)
+				resId: resId
 			};
-
 			isDragging = false;
 			_weekViewWasDragging = false;
+			$('.drag-tooltip').remove();
+			dragTooltip = null;
 		});
 
 		$(document).on('mousemove.weekview', function (e) {
@@ -492,17 +510,18 @@ function clickNew(item, callback) {
 
 			if (!isDragging && Math.abs(currentY - dragStartData.startY) > 5) {
 				isDragging = true;
-
-				dragGhost = $('<div class="drag-ghost"></div>').css({
-					position: 'absolute',
-					left: '0',
-					width: '100%',
-					backgroundColor: 'rgba(50, 150, 255, 0.4)',
-					border: '1px solid #007bff',
-					zIndex: 100,
-					pointerEvents: 'none'
-				});
-				col.append(dragGhost);
+				if ($('.drag-ghost').length === 0) {
+					dragGhost = $('<div class="drag-ghost"></div>');
+					col.append(dragGhost);
+				} else {
+					dragGhost = $('.drag-ghost');
+				}
+				if ($('.drag-tooltip').length === 0) {
+					dragTooltip = $('<div class="drag-tooltip"></div>');
+					$('body').append(dragTooltip);
+				} else {
+					dragTooltip = $('.drag-tooltip');
+				}
 			}
 
 			if (isDragging) {
@@ -512,75 +531,64 @@ function clickNew(item, callback) {
 					top: top + 'px',
 					height: height + 'px'
 				});
+
+				var startY = Math.min(dragStartData.startY, currentY);
+				var endY = Math.max(dragStartData.startY, currentY);
+				if (endY - startY < 10) endY = startY + 10;
+
+				var start = getTimeFromY(startY, dragStartData.dayKey);
+				var end = getTimeFromY(endY, dragStartData.dayKey);
+				start = snapTo30(start);
+				end = snapTo30(end);
+				if (end.getTime() <= start.getTime()) {
+					end = new Date(start.getTime() + 30 * 60000);
+				}
+
+				var timeStr = formatTime(start) + ' - ' + formatTime(end);
+				var durStr = '(' + formatDuration(end - start) + ')';
+				dragTooltip.text(timeStr + ' ' + durStr);
+				dragTooltip.css({
+					top: (e.clientY - 40) + 'px',
+					left: (e.clientX + 15) + 'px'
+				});
 			}
 		});
 
 		$(document).on('mouseup.weekview', function (e) {
 			if (!dragStartData) return;
 
-			// Check event target to ensure we are still interacting with the day column or its children (ghost)
-			// But mouseup can happen anywhere, we generally want to capture it if we started on day-col.
-
 			if (isDragging) {
-				// DRAG END
 				var col = dragStartData.col;
 				var rect = col[0].getBoundingClientRect();
 				var currentY = e.clientY - rect.top;
-
 				var startY = Math.min(dragStartData.startY, currentY);
 				var endY = Math.max(dragStartData.startY, currentY);
+				if (endY - startY < 10) endY = startY + 10;
 
-				if (endY - startY < 10) {
-					// Too small difference, treat as click? 
-					// Actually if isDragging is true, we moved > 5px.
-					// If < 10px duration, maybe just ignore or treat as 10 min?
-					// Let's treat as click if really small, or just ignore.
-				} else {
-					var start = getTimeFromY(startY, dragStartData.dayKey);
-					var end = getTimeFromY(endY, dragStartData.dayKey);
-
-					if (window.openCustomAddDialogRange) {
-						window.openCustomAddDialogRange(start.getTime(), end.getTime(), dragStartData.resId);
-					}
+				var start = getTimeFromY(startY, dragStartData.dayKey);
+				var end = getTimeFromY(endY, dragStartData.dayKey);
+				start = snapTo30(start);
+				end = snapTo30(end);
+				if (end.getTime() <= start.getTime()) {
+					end = new Date(start.getTime() + 30 * 60000);
 				}
 
-				if (dragGhost) dragGhost.remove();
-			} else {
-				// CLICK (No drag occurred)
-				// We started on day-col (dragStartData is set) and didn't move enough to drag.
-				// Treat as creating a new booking at that spot.
-
-				// Validate we are not clicking on an event-card (checked in mousedown)
-
-				var start = getTimeFromY(dragStartData.startY, dragStartData.dayKey);
-
-				if (window.openCustomAddDialog) {
-					// Standard dialog (defaults to +1 hour)
-					// We need to pass the time as date object or string?
-					// openCustomAddDialog takes (dateStr, minutesOffset, resourceId)
-					// But we have precise Date object from getTimeFromY.
-					// Let's allow openCustomAddDialogRange to handle Point clicks if we want, 
-					// OR adapt openCustomAddDialog.
-					// openCustomAddDialog uses dateStr + offset.
-
-					// Let's just use openCustomAddDialogRange for consistent object creation, 
-					// or manually call clickNew logic.
-					// Actually, openCustomAddDialog implies "Add".
-					// Let's reuse openCustomAddDialogRange with Start + 1 Hour (default behavior).
-
-					var end = new Date(start.getTime() + 60 * 60000); // +1 hour
-					if (window.openCustomAddDialogRange) {
-						window.openCustomAddDialogRange(start.getTime(), end.getTime(), dragStartData.resId);
-					}
+				if (window.openCustomAddDialogRange) {
+					window.openCustomAddDialogRange(start.getTime(), end.getTime(), dragStartData.resId);
 				}
+				$('.drag-ghost').remove();
+				dragGhost = null;
+				_weekViewWasDragging = true;
 			}
 
+			$('.drag-tooltip').remove();
+			dragTooltip = null;
 			dragStartData = null;
 			isDragging = false;
-			_weekViewWasDragging = true; // Set true so subsequent 'click' legacy event is ignored
+			setTimeout(function () { _weekViewWasDragging = false; }, 100);
 		});
 	}
 
-	// Start initialization
 	initDragEvents();
 })();
+console.log('DEBUG: End of booking.js - Loaded Successfully');
