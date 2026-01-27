@@ -25,20 +25,30 @@ public class MResourceAssignment extends org.compiere.model.MResourceAssignment 
 	@Override
 	protected boolean beforeSave(boolean newRecord) {
 		// TODO Auto-generated method stub
-		//return super.beforeSave(newRecord);
-		if(isOverlap())
+		// return super.beforeSave(newRecord);
+		if (isOverlap())
 			return false;
 		return true;
 	}
-	   public  boolean isOverlap() {
-	        String sql = "select count(*) from S_ResourceAssignment "
-	        		+ "where s_resource_id = ? "
-	        		+ "and  (? < assigndateto) "
-	        		+ "and ( assigndatefrom < ? ) "
-	        		+ " and S_ResourceAssignment_ID != ? ";
-	        
-	        Object[] paras = new Object[] { getS_Resource_ID(),getAssignDateFrom(),getAssignDateTo(),getS_ResourceAssignment_ID() };
-	        
-	        return DB.getSQLValue(get_TrxName(), sql, paras) > 0;
-	    }
+
+	public void setName(String name) {
+		set_Value("Name", name);
+	}
+
+	public void setDescription(String description) {
+		set_Value("Description", description);
+	}
+
+	public boolean isOverlap() {
+		String sql = "select count(*) from S_ResourceAssignment "
+				+ "where s_resource_id = ? "
+				+ "and  (? < assigndateto) "
+				+ "and ( assigndatefrom < ? ) "
+				+ " and S_ResourceAssignment_ID != ? ";
+
+		Object[] paras = new Object[] { getS_Resource_ID(), getAssignDateFrom(), getAssignDateTo(),
+				getS_ResourceAssignment_ID() };
+
+		return DB.getSQLValue(get_TrxName(), sql, paras) > 0;
+	}
 }

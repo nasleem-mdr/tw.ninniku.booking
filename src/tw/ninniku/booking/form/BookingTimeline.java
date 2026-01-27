@@ -273,10 +273,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				errorMessage = "Subject (Name) is required.";
 				return false;
 			}
-			if (description.isEmpty()) {
-				errorMessage = "Memo (Description) is required.";
-				return false;
-			}
 
 			booking.setDescription(description);
 			booking.setName(name);
