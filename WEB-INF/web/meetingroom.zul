@@ -48,6 +48,7 @@
 .event-card.editable { cursor: grab; }
 .event-card.editable:active { cursor: grabbing; }
 .drag-ghost { position: absolute; background: rgba(33, 150, 243, 0.6); border: 2px solid #1565C0; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); z-index: 100; pointer-events: none; }
+.current-time-line { position: absolute; left: 0; width: 100%; border-top: 2px solid red; z-index: 100; pointer-events: none; display: none; }
 .drag-tooltip { position: fixed; background: rgba(0, 0, 0, 0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 2147483647; white-space: nowrap; box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5); }
 .delete-icon { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; line-height: 16px; text-align: center; color: rgba(255, 255, 255, 0.7); font-weight: bold; cursor: pointer; border-radius: 50%; z-index: 20; }
 .delete-icon:hover { color: #fff; background-color: rgba(255, 0, 0, 0.7); }
@@ -473,6 +474,55 @@
                     $('.drag-tooltip').remove();
                     dragTooltip = null;
                 });
+                
+                // --- Helper Functions ---
+                function getResourceColor(id) {
+                    var colors = ['#3F51B5', '#009688', '#FF9800', '#E91E63', '#673AB7', '#2196F3', '#4CAF50', '#FFC107', '#9C27B0', '#795548'];
+                    return colors[id % colors.length];
+                }
+
+                window.updateTimeIndicator = function() {
+                    var $line = $('.current-time-line');
+                    if ($line.length === 0) return;
+
+                    var now = new Date();
+                    var currentHour = now.getHours();
+                    var currentMin = now.getMinutes();
+
+                    var root = $('.week-view-root');
+                    if (root.length === 0) return;
+
+                    var startHour = parseInt(root.attr('data-start-hour') || 0);
+                    // End hour check not strictly needed if we clamp or hide, but good for safety
+                    // Assuming grid logic (renderWeekView) always renders enough height for the view range
+
+                    var minutesFromStart = (currentHour - startHour) * 60 + currentMin;
+                    
+                    // 40px per hour = 40/60 px per minute
+                    var topPx = minutesFromStart * (40.0 / 60.0);
+
+                    // Clamp/Hide
+                    var totalHeight = root.find('.days-grid').height();
+                    
+                    if (minutesFromStart < 0 || topPx > totalHeight) {
+                        $line.hide();
+                    } else {
+                        $line.css('top', topPx + 'px').show();
+                        
+                        // Add a small "circle" indicator on the left if desired? 
+                        // For now just the line as requested.
+                    }
+                }
+
+                // Initial run and Timer for Time Indicator
+                $(document).ready(function() {
+                    updateTimeIndicator();
+                    if (window._timeIndicatorInterval) clearInterval(window._timeIndicatorInterval);
+                    window._timeIndicatorInterval = setInterval(updateTimeIndicator, 60000); // 1 minute
+                });
+
+                // Also run immediately in case of ZUL update
+                updateTimeIndicator();
 
                 // --- Global Mouse Move ---
                 $(document).on('mousemove.weekview', function (e) {

@@ -811,6 +811,10 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 			html.append("</div>");
 		}
+
+		// Add Current Time Indicator Line
+		html.append("<div class='current-time-line'></div>");
+
 		html.append("</div>"); // days-grid
 		html.append("</div>"); // week-layout
 		html.append("</div>"); // scroll-body
