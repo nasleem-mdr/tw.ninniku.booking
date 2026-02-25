@@ -80,12 +80,10 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private Timestamp currentViewDate; // Represents the start of the view or 'focus' date
 
-	public String errorMessage = "";
+	private String errorMessage = "";
 
 	@Override
 	public void valueChange(ValueChangeEvent evt) {
-		// TODO Auto-generated method stub
-
 	}
 
 	@Override
@@ -149,8 +147,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			refreshView();
 
 		} else if (event.getTarget().getId().equals("bookingUpdated")) {
-			// MQTT.thread(new MQTT.TimelineProducer("TIMELINE", "RAY"), false);
-
 			JSONObject json = new JSONObject(itemData.getValue());
 			if (!updateBooking(json)) {
 				Clients.showNotification(errorMessage);
@@ -342,9 +338,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			}
 
 			trx.commit();
-
-			// Print a message indicating a successful commit
-			trx.commit();
 		} catch (Exception e) {
 			ok = false;
 			errorMessage = "Error saving booking: " + e.getMessage();
@@ -405,8 +398,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		btnViewDay = (Button) component.getFellow("btnViewDay");
 		btnPrev = (Button) component.getFellow("btnPrev");
 		btnNext = (Button) component.getFellow("btnNext");
-		btnPrev = (Button) component.getFellow("btnPrev");
-		btnNext = (Button) component.getFellow("btnNext");
 		btnToday = (Button) component.getFellow("btnToday");
 
 		chkWorkHours = (org.zkoss.zul.Checkbox) component.getFellow("chkWorkHours");
@@ -452,8 +443,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	}
 
 	private void addResourceTypeItem() {
-		ArrayList<Item> list = new ArrayList<Item>();
-
 		String whereSql = " AD_Client_ID= ? ";
 
 		List<MResourceType> rosueceTypes = new Query(Env.getCtx(), MResourceType.Table_Name, whereSql, null)
@@ -568,11 +557,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			pstmt.setInt(1, Integer.valueOf((String) item.getId()));
 			rs = pstmt.executeQuery();
 			while (rs.next()) {
-
-				String code = rs.getString("value");
 				int id = rs.getInt("s_resource_id");
 				String name = rs.getString("name");
-				// Use name as content if available, code is value
 				list.add(new Group(id, name));
 			}
 		} catch (SQLException ex) {
