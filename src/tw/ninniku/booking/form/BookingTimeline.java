@@ -598,17 +598,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		cal.add(Calendar.DAY_OF_YEAR, 5);
 		Timestamp end = new Timestamp(cal.getTimeInMillis());
 
-		// Initialize resource name map
-		Map<Integer, String> resourceNameMap = new HashMap<>();
-		if (groups != null) {
-			for (Group g : groups) {
-				try {
-					resourceNameMap.put(Integer.valueOf(g.getId()), g.getContent());
-				} catch (NumberFormatException e) {
-					// Ignore invalid IDs
-				}
-			}
-		}
+		Map<Integer, String> resourceNameMap = buildResourceNameMap();
 
 		List<MResourceAssignment> bookings = fetchBookings(start, end);
 
@@ -814,17 +804,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		cal.add(Calendar.DAY_OF_YEAR, 1);
 		Timestamp end = new Timestamp(cal.getTimeInMillis());
 
-		// Build resource name map
-		Map<Integer, String> resourceNameMap = new HashMap<>();
-		if (groups != null) {
-			for (Group g : groups) {
-				try {
-					resourceNameMap.put(Integer.valueOf(g.getId()), g.getContent());
-				} catch (NumberFormatException e) {
-					// Ignore invalid IDs
-				}
-			}
-		}
+		Map<Integer, String> resourceNameMap = buildResourceNameMap();
 
 		List<MResourceAssignment> bookings = fetchBookings(start, end);
 
@@ -1022,6 +1002,20 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	/**
 	 * Returns a deterministic color for a resource ID.
 	 */
+	private Map<Integer, String> buildResourceNameMap() {
+		Map<Integer, String> map = new HashMap<>();
+		if (groups != null) {
+			for (Group g : groups) {
+				try {
+					map.put(Integer.valueOf(g.getId()), g.getContent());
+				} catch (NumberFormatException e) {
+					// Ignore invalid IDs
+				}
+			}
+		}
+		return map;
+	}
+
 	private String getResourceColor(int resourceId) {
 		// Palette of pleasing colors (Material Design / Google Calendar style)
 		String[] colors = {
