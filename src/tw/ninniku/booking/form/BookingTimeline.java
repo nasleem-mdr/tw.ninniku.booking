@@ -871,15 +871,16 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		html.append("<div class='week-view-root' data-start-hour='" + startHour + "'>");
 
-		// Header
-		html.append("<div class='week-header'>");
-
-		// Show the date in the time spacer
+		// Date title row
 		SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy/MM/dd (EEE)");
 		cal.setTime(start);
-		html.append("<div class='header-time-spacer' style='font-size:11px; line-height:40px;'>")
+		html.append("<div style='text-align:center; font-size:15px; font-weight:bold; padding:6px 0; background:#f5f5f5; border-bottom:1px solid #ddd; flex-shrink:0;'>")
 				.append(sdfDate.format(cal.getTime()))
 				.append("</div>");
+
+		// Header — resource names
+		html.append("<div class='week-header'>");
+		html.append("<div class='header-time-spacer'></div>");
 
 		// One header column per resource (room)
 		SimpleDateFormat sdfKey = new SimpleDateFormat("yyyy-MM-dd");
