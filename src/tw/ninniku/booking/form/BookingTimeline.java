@@ -4,8 +4,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.HashMap;
@@ -22,7 +21,7 @@ import org.adempiere.webui.event.ValueChangeEvent;
 import org.adempiere.webui.event.ValueChangeListener;
 import org.adempiere.webui.panel.ADForm;
 import org.adempiere.webui.panel.IFormController;
-import org.adempiere.webui.theme.ThemeManager;
+
 import org.compiere.model.MResourceType;
 import org.compiere.model.MUser;
 import org.compiere.model.Query;
@@ -35,7 +34,7 @@ import org.zkoss.zk.ui.Executions;
 import org.zkoss.zk.ui.event.Event;
 import org.zkoss.zk.ui.event.EventListener;
 import org.zkoss.zk.ui.event.Events;
-import org.zkoss.zk.ui.http.ExecutionImpl;
+
 import org.zkoss.zk.ui.util.Clients;
 import org.zkoss.zul.Button;
 import org.zkoss.zul.Div;
@@ -357,15 +356,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		}
 	}
 
-	private Timestamp convertTimestamp(String dateString) {
-		LocalDateTime localDateTime = LocalDateTime.parse(dateString);
-
-		// Convert LocalDateTime to a timestamp in milliseconds
-		long timestamp = localDateTime.toInstant(ZoneOffset.ofHours(8)).toEpochMilli();
-
-		return new Timestamp(timestamp);
-	}
-
 	private boolean updateBooking(int s_Booking_ID, int groupID, Timestamp ds, Timestamp de) {
 		if (s_Booking_ID <= 0)
 			return false; // Cannot update a non-existent booking, prevents NULL Name error on insert
@@ -495,13 +485,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		String cmd = "items = new vis.DataSet(" + itemJson + ");";
 		cmd = " setTimeout(function(){" + cmd + "}," + delay + ");";
 		// cmd = " jq(document).ready(function () {" +cmd+ " });";
-		Clients.evalJavaScript(cmd);
-
-	}
-
-	private void draw(int delay) {
-
-		String cmd = " setTimeout(function(){ drawChart();}," + delay + ");";
 		Clients.evalJavaScript(cmd);
 
 	}
