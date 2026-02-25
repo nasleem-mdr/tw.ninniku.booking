@@ -55,7 +55,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private static final long serialVersionUID = 1L;
 	private ArrayList<Group> groups;
-	String version = "3.20";
+	String version = "3.30";
 	Textbox dateStart;
 	Textbox dateEnd;
 	Textbox dateLast;
