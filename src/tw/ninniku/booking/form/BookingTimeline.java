@@ -70,12 +70,13 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	// View Switching
 	private Div bookingContainer;
-	private Button btnViewTimeline, btnViewWeek;
+	private Button btnViewTimeline, btnViewWeek, btnViewDay;
 	private Button btnPrev, btnNext, btnToday, btnRefresh, btnAddBooking;
 	private org.zkoss.zul.Checkbox chkWorkHours;
 
 	private static final String VIEW_TIMELINE = "TIMELINE";
 	private static final String VIEW_WEEK = "WEEK";
+	private static final String VIEW_DAY = "DAY";
 	private String currentViewMode = VIEW_WEEK;
 
 	private Timestamp currentViewDate; // Represents the start of the view or 'focus' date
@@ -126,6 +127,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			updateViewMode(VIEW_TIMELINE);
 		} else if (event.getTarget() == btnViewWeek) {
 			updateViewMode(VIEW_WEEK);
+		} else if (event.getTarget() == btnViewDay) {
+			updateViewMode(VIEW_DAY);
 		} else if (event.getTarget() == btnPrev) {
 			navigateView(-1);
 		} else if (event.getTarget() == btnNext) {
@@ -176,6 +179,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		this.currentViewMode = mode;
 		btnViewTimeline.setDisabled(mode.equals(VIEW_TIMELINE));
 		btnViewWeek.setDisabled(mode.equals(VIEW_WEEK));
+		btnViewDay.setDisabled(mode.equals(VIEW_DAY));
 		refreshView();
 	}
 
@@ -185,6 +189,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		if (VIEW_WEEK.equals(currentViewMode)) {
 			cal.add(Calendar.WEEK_OF_YEAR, direction);
+		} else if (VIEW_DAY.equals(currentViewMode)) {
+			cal.add(Calendar.DAY_OF_YEAR, direction);
 		} else {
 			// Timeline default nav (maybe 1 week?)
 			cal.add(Calendar.DAY_OF_YEAR, direction * 7);
@@ -219,6 +225,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			Clients.evalJavaScript(cmd);
 		} else if (VIEW_WEEK.equals(currentViewMode)) {
 			renderWeekView();
+		} else if (VIEW_DAY.equals(currentViewMode)) {
+			renderDayView();
 		}
 	}
 
@@ -404,6 +412,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		btnViewTimeline.setDisabled(false);
 		btnViewWeek = (Button) component.getFellow("btnViewWeek");
 		btnViewWeek.setDisabled(true);
+		btnViewDay = (Button) component.getFellow("btnViewDay");
 		btnPrev = (Button) component.getFellow("btnPrev");
 		btnNext = (Button) component.getFellow("btnNext");
 		btnPrev = (Button) component.getFellow("btnPrev");
@@ -435,6 +444,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		btnViewTimeline.addEventListener(Events.ON_CLICK, this);
 		btnViewWeek.addEventListener(Events.ON_CLICK, this);
+		btnViewDay.addEventListener(Events.ON_CLICK, this);
 		btnPrev.addEventListener(Events.ON_CLICK, this);
 		btnNext.addEventListener(Events.ON_CLICK, this);
 		btnToday.addEventListener(Events.ON_CLICK, this);
@@ -819,6 +829,13 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		// triggers client rendering
 		// Clients.evalJavaScript("setTimeout(function(){ if(window.weekViewScrollTo8Am)
 		// window.weekViewScrollTo8Am(); }, 100);");
+	}
+
+	private void renderDayView() {
+		// TODO: implement in Task 4
+		Html zkHtml = new Html();
+		zkHtml.setContent("<div style='padding:20px;'>Day View coming soon</div>");
+		bookingContainer.appendChild(zkHtml);
 	}
 
 	/**

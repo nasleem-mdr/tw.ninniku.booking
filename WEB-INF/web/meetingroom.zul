@@ -15,6 +15,7 @@
             <separator bar="true"/>
             <button id="btnViewTimeline" label="Timeline" mold="os" disabled="true"/>
             <button id="btnViewWeek" label="Week" mold="os"/>
+            <button id="btnViewDay" label="Day" mold="os"/>
             <separator bar="true"/>
             <button id="btnPrev" label="&lt;" mold="os"/>
             <button id="btnToday" label="Today" mold="os"/>
