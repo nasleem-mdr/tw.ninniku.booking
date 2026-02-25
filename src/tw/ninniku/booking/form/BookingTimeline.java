@@ -626,7 +626,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		cal.set(Calendar.SECOND, 0);
 		Timestamp start = new Timestamp(cal.getTimeInMillis());
 
-		cal.add(Calendar.DAY_OF_YEAR, 7);
+		cal.add(Calendar.DAY_OF_YEAR, 5);
 		Timestamp end = new Timestamp(cal.getTimeInMillis());
 
 		// Initialize resource name map
@@ -663,7 +663,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		SimpleDateFormat sdfKey = new SimpleDateFormat("yyyy-MM-dd");
 		cal.setTime(start);
 		List<String> dayKeys = new ArrayList<String>();
-		for (int i = 0; i < 7; i++) {
+		for (int i = 0; i < 5; i++) {
 			html.append("<div class='header-day'>").append(sdfDay.format(cal.getTime())).append("</div>");
 			dayKeys.add(sdfKey.format(cal.getTime()));
 			cal.add(Calendar.DAY_OF_YEAR, 1);
