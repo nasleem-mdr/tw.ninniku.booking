@@ -656,37 +656,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				}
 			}
 
-			// 2. Sort by start time, then end time
-			Collections.sort(dayEvents, new Comparator<MResourceAssignment>() {
-				public int compare(MResourceAssignment o1, MResourceAssignment o2) {
-					int val = o1.getAssignDateFrom().compareTo(o2.getAssignDateFrom());
-					if (val == 0)
-						return o2.getAssignDateTo().compareTo(o1.getAssignDateTo());
-					return val;
-				}
-			});
+			List<List<MResourceAssignment>> columns = sortAndPackEvents(dayEvents);
 
-			// 3. Pack into columns (simple greedy algorithm)
-			List<List<MResourceAssignment>> columns = new ArrayList<>();
-			for (MResourceAssignment evt : dayEvents) {
-				boolean placed = false;
-				for (List<MResourceAssignment> col : columns) {
-					MResourceAssignment last = col.get(col.size() - 1);
-					// Check if evt starts after last event ends (>=)
-					if (evt.getAssignDateFrom().getTime() >= last.getAssignDateTo().getTime()) {
-						col.add(evt);
-						placed = true;
-						break;
-					}
-				}
-				if (!placed) {
-					List<MResourceAssignment> newCol = new ArrayList<>();
-					newCol.add(evt);
-					columns.add(newCol);
-				}
-			}
-
-			// 4. Render columns
+			// Render columns
 			int numCols = columns.size();
 			double colWidthPercent = 95.0 / (numCols > 0 ? numCols : 1);
 
@@ -874,36 +846,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 					}
 				}
 
-				// 2. Sort by start time, then end time
-				Collections.sort(resEvents, new Comparator<MResourceAssignment>() {
-					public int compare(MResourceAssignment o1, MResourceAssignment o2) {
-						int val = o1.getAssignDateFrom().compareTo(o2.getAssignDateFrom());
-						if (val == 0)
-							return o2.getAssignDateTo().compareTo(o1.getAssignDateTo());
-						return val;
-					}
-				});
+				List<List<MResourceAssignment>> columns = sortAndPackEvents(resEvents);
 
-				// 3. Pack into columns (simple greedy algorithm)
-				List<List<MResourceAssignment>> columns = new ArrayList<>();
-				for (MResourceAssignment evt : resEvents) {
-					boolean placed = false;
-					for (List<MResourceAssignment> col : columns) {
-						MResourceAssignment last = col.get(col.size() - 1);
-						if (evt.getAssignDateFrom().getTime() >= last.getAssignDateTo().getTime()) {
-							col.add(evt);
-							placed = true;
-							break;
-						}
-					}
-					if (!placed) {
-						List<MResourceAssignment> newCol = new ArrayList<>();
-						newCol.add(evt);
-						columns.add(newCol);
-					}
-				}
-
-				// 4. Render columns
+				// Render columns
 				int numCols = columns.size();
 				double colWidthPercent = 95.0 / (numCols > 0 ? numCols : 1);
 
@@ -1002,6 +947,36 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	/**
 	 * Returns a deterministic color for a resource ID.
 	 */
+	private List<List<MResourceAssignment>> sortAndPackEvents(List<MResourceAssignment> events) {
+		Collections.sort(events, new Comparator<MResourceAssignment>() {
+			public int compare(MResourceAssignment o1, MResourceAssignment o2) {
+				int val = o1.getAssignDateFrom().compareTo(o2.getAssignDateFrom());
+				if (val == 0)
+					return o2.getAssignDateTo().compareTo(o1.getAssignDateTo());
+				return val;
+			}
+		});
+
+		List<List<MResourceAssignment>> columns = new ArrayList<>();
+		for (MResourceAssignment evt : events) {
+			boolean placed = false;
+			for (List<MResourceAssignment> col : columns) {
+				MResourceAssignment last = col.get(col.size() - 1);
+				if (evt.getAssignDateFrom().getTime() >= last.getAssignDateTo().getTime()) {
+					col.add(evt);
+					placed = true;
+					break;
+				}
+			}
+			if (!placed) {
+				List<MResourceAssignment> newCol = new ArrayList<>();
+				newCol.add(evt);
+				columns.add(newCol);
+			}
+		}
+		return columns;
+	}
+
 	private Map<Integer, String> buildResourceNameMap() {
 		Map<Integer, String> map = new HashMap<>();
 		if (groups != null) {
