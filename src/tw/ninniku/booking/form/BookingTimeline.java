@@ -70,13 +70,12 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	// View Switching
 	private Div bookingContainer;
-	private Button btnViewTimeline, btnViewWeek, btnViewMonth;
+	private Button btnViewTimeline, btnViewWeek;
 	private Button btnPrev, btnNext, btnToday, btnRefresh, btnAddBooking;
 	private org.zkoss.zul.Checkbox chkWorkHours;
 
 	private static final String VIEW_TIMELINE = "TIMELINE";
 	private static final String VIEW_WEEK = "WEEK";
-	private static final String VIEW_MONTH = "MONTH";
 	private String currentViewMode = VIEW_WEEK;
 
 	private Timestamp currentViewDate; // Represents the start of the view or 'focus' date
@@ -127,8 +126,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			updateViewMode(VIEW_TIMELINE);
 		} else if (event.getTarget() == btnViewWeek) {
 			updateViewMode(VIEW_WEEK);
-		} else if (event.getTarget() == btnViewMonth) {
-			updateViewMode(VIEW_MONTH);
 		} else if (event.getTarget() == btnPrev) {
 			navigateView(-1);
 		} else if (event.getTarget() == btnNext) {
@@ -179,7 +176,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		this.currentViewMode = mode;
 		btnViewTimeline.setDisabled(mode.equals(VIEW_TIMELINE));
 		btnViewWeek.setDisabled(mode.equals(VIEW_WEEK));
-		btnViewMonth.setDisabled(mode.equals(VIEW_MONTH));
 		refreshView();
 	}
 
@@ -189,8 +185,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		if (VIEW_WEEK.equals(currentViewMode)) {
 			cal.add(Calendar.WEEK_OF_YEAR, direction);
-		} else if (VIEW_MONTH.equals(currentViewMode)) {
-			cal.add(Calendar.MONTH, direction);
 		} else {
 			// Timeline default nav (maybe 1 week?)
 			cal.add(Calendar.DAY_OF_YEAR, direction * 7);
@@ -225,8 +219,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			Clients.evalJavaScript(cmd);
 		} else if (VIEW_WEEK.equals(currentViewMode)) {
 			renderWeekView();
-		} else if (VIEW_MONTH.equals(currentViewMode)) {
-			renderMonthView();
 		}
 	}
 
@@ -412,7 +404,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		btnViewTimeline.setDisabled(false);
 		btnViewWeek = (Button) component.getFellow("btnViewWeek");
 		btnViewWeek.setDisabled(true);
-		btnViewMonth = (Button) component.getFellow("btnViewMonth");
 		btnPrev = (Button) component.getFellow("btnPrev");
 		btnNext = (Button) component.getFellow("btnNext");
 		btnPrev = (Button) component.getFellow("btnPrev");
@@ -444,7 +435,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		btnViewTimeline.addEventListener(Events.ON_CLICK, this);
 		btnViewWeek.addEventListener(Events.ON_CLICK, this);
-		btnViewMonth.addEventListener(Events.ON_CLICK, this);
 		btnPrev.addEventListener(Events.ON_CLICK, this);
 		btnNext.addEventListener(Events.ON_CLICK, this);
 		btnToday.addEventListener(Events.ON_CLICK, this);
@@ -829,148 +819,6 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		// triggers client rendering
 		// Clients.evalJavaScript("setTimeout(function(){ if(window.weekViewScrollTo8Am)
 		// window.weekViewScrollTo8Am(); }, 100);");
-	}
-
-	private void renderMonthView() {
-		Calendar cal = Calendar.getInstance();
-		cal.setTime(currentViewDate);
-
-		cal.set(Calendar.DAY_OF_MONTH, 1);
-		int currentMonth = cal.get(Calendar.MONTH);
-		cal.setFirstDayOfWeek(Calendar.MONDAY);
-		cal.set(Calendar.DAY_OF_WEEK, Calendar.MONDAY);
-		// Backtrack to start of week can go to prev month
-		if (cal.get(Calendar.MONTH) == currentMonth && cal.get(Calendar.DAY_OF_MONTH) > 1) {
-			cal.add(Calendar.DATE, -7); // Safety
-		}
-		// Actually typical logic: set to 1st, then while day != Monday subtract 1
-		cal.setTime(currentViewDate);
-		cal.set(Calendar.DAY_OF_MONTH, 1);
-		while (cal.get(Calendar.DAY_OF_WEEK) != Calendar.MONDAY) {
-			cal.add(Calendar.DATE, -1);
-		}
-		Timestamp start = new Timestamp(cal.getTimeInMillis());
-
-		// End date: 6 weeks (42 days) from start is usually enough to cover
-		cal.add(Calendar.DATE, 35); // 5 rows
-		// Check if we cover the whole month
-		Calendar test = Calendar.getInstance();
-		test.setTime(currentViewDate);
-		test.set(Calendar.DAY_OF_MONTH, 1);
-		test.add(Calendar.MONTH, 1);
-		test.add(Calendar.DATE, -1); // Last day of month
-		if (test.getTimeInMillis() > cal.getTimeInMillis()) {
-			cal.add(Calendar.DATE, 7); // add one more week
-		}
-		Timestamp end = new Timestamp(cal.getTimeInMillis());
-
-		// Initialize resource name map
-		Map<Integer, String> resourceNameMap = new HashMap<>();
-		if (groups != null) {
-			for (Group g : groups) {
-				try {
-					resourceNameMap.put(Integer.valueOf(g.getId()), g.getContent());
-				} catch (NumberFormatException e) {
-					// Ignore invalid IDs
-				}
-			}
-		}
-
-		List<MResourceAssignment> bookings = fetchBookings(start, end);
-
-		StringBuilder html = new StringBuilder();
-
-		html.append("<style>");
-		html.append(
-				".month-view-root { font-family: 'Roboto', sans-serif; background: transparent; padding: 0; margin: 0; height: 100%; display: flex; flex-direction: column; }");
-		html.append(
-				".month-container { display: flex; flex-direction: column; height: 100%; border: 1px solid #ddd; background: white; flex: 1; }");
-		html.append(
-				".month-header-row { display: flex; height: 30px; background: #f5f5f5; border-bottom: 1px solid #ddd; flex-shrink: 0; }");
-		html.append(
-				".month-day-header { flex: 1; text-align: center; line-height: 30px; font-weight: bold; color: #666; font-size: 13px; border-right: 1px solid #eee; }");
-		html.append(
-				".month-grid { display: flex; flex: 1; flex-wrap: wrap; overflow-y: auto; align-content: flex-start; }");
-		html.append(
-				".month-cell { width: 14.28%; height: 20%; min-height: 100px; border-right: 1px solid #eee; border-bottom: 1px solid #eee; box-sizing: border-box; padding: 4px; overflow-y: auto; cursor: pointer; }");
-		html.append(".date-label { font-size: 12px; font-weight: bold; color: #333; margin-bottom: 4px; }");
-		html.append(".date-label.other-month { color: #ccc; }");
-		html.append(
-				".m-event { font-size: 10px; margin-bottom: 2px; padding: 1px 3px; border-radius: 2px; color: white; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; cursor: pointer; }");
-		html.append("</style>");
-
-		html.append("<div class='month-view-root'>");
-		html.append("<div class='month-container'>");
-
-		// Header
-		html.append("<div class='month-header-row'>");
-		String[] days = { "Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun" };
-		for (String d : days)
-			html.append("<div class='month-day-header'>").append(d).append("</div>");
-		html.append("</div>");
-
-		// Grid
-		html.append("<div class='month-grid'>");
-
-		cal.setTime(start);
-		SimpleDateFormat sdfKey = new SimpleDateFormat("yyyy-MM-dd");
-
-		while (cal.getTimeInMillis() < end.getTime()) {
-			String dayKey = sdfKey.format(cal.getTime());
-			boolean isOther = cal.get(Calendar.MONTH) != currentMonth;
-
-			html.append("<div class='month-cell' onclick=\"window.openCustomAddDialog('" + dayKey + "', 540, '"
-					+ (groups != null && groups.size() > 0 ? groups.get(0).getId() : "") + "');\">");
-			html.append("<div class='date-label").append(isOther ? " other-month" : "").append("'>")
-					.append(cal.get(Calendar.DAY_OF_MONTH)).append("</div>");
-
-			// Render events
-			for (MResourceAssignment b : bookings) {
-				// Simplified whole-day check or start-day check
-				// This logic doesn't handle multi-day events well visually (repeats them), but
-				// good enough for MVP
-				// Check if b intersects with this day
-				long dayStart = cal.getTimeInMillis();
-				long dayEnd = dayStart + 86400000L;
-				if (b.getAssignDateFrom().getTime() < dayEnd && b.getAssignDateTo().getTime() > dayStart) {
-					MUser user = new MUser(Env.getCtx(), b.getCreatedBy(), null);
-					String nameEsc = b.getName().replace("'", "\\'");
-					String descEsc = (b.getDescription() != null
-							? b.getDescription().replace("\n", " ").replace("'", "\\'")
-							: "");
-					String color = getResourceColor(b.getS_Resource_ID());
-
-					String resName = resourceNameMap.getOrDefault(b.getS_Resource_ID(), "");
-					if (!resName.isEmpty())
-						resName = "[" + resName + "] ";
-
-					SimpleDateFormat sdfTime = new SimpleDateFormat("HH:mm");
-					String timeRange = sdfTime.format(b.getAssignDateFrom()) + " - "
-							+ sdfTime.format(b.getAssignDateTo());
-					String tooltip = String.format("Applicant: %s\nTime: %s\nSubject: %s\nDescription: %s",
-							user.getName(), timeRange, b.getName(),
-							(b.getDescription() != null ? b.getDescription() : ""));
-					// Escape single quotes for HTML attribute
-					tooltip = tooltip.replace("'", "&#39;");
-
-					html.append(String.format("<div class='m-event' style='background-color:%s;' title='%s' "
-							+ "onclick=\"event.stopPropagation(); window.openCustomEditDialog('%d', '%s', '%s', '%d', %d, %d);\">%s%s</div>",
-							color, tooltip, b.getS_ResourceAssignment_ID(), nameEsc, descEsc, b.getS_Resource_ID(),
-							b.getAssignDateFrom().getTime(), b.getAssignDateTo().getTime(), resName, b.getName()));
-				}
-			}
-
-			html.append("</div>");
-			cal.add(Calendar.DATE, 1);
-		}
-
-		html.append("</div></div></div>");
-
-		Html zkHtml = new Html();
-		zkHtml.setHflex("1");
-		zkHtml.setVflex("1");
-		zkHtml.setContent(html.toString());
-		bookingContainer.appendChild(zkHtml);
 	}
 
 	/**
