@@ -13,9 +13,9 @@
             <separator bar="true"/>
             <button id="btnAddBooking" label="Add Booking" mold="os" style="background-color: #1976D2; color: black; font-weight: bold; border-radius: 4px; box-shadow: 0 2px 5px rgba(0,0,0,0.2);" />
             <separator bar="true"/>
-            <button id="btnViewTimeline" label="Timeline" mold="os" disabled="true"/>
             <button id="btnViewWeek" label="Week" mold="os"/>
             <button id="btnViewDay" label="Day" mold="os"/>
+            <button id="btnViewTimeline" label="Timeline" mold="os"/>
             <separator bar="true"/>
             <button id="btnPrev" label="&lt;" mold="os"/>
             <button id="btnToday" label="Today" mold="os"/>
