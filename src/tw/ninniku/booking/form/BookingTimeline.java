@@ -832,9 +832,220 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	}
 
 	private void renderDayView() {
-		// TODO: implement in Task 4
+		Calendar cal = Calendar.getInstance();
+		cal.setTime(currentViewDate);
+
+		// Set to midnight of the current day
+		cal.set(Calendar.HOUR_OF_DAY, 0);
+		cal.set(Calendar.MINUTE, 0);
+		cal.set(Calendar.SECOND, 0);
+		cal.set(Calendar.MILLISECOND, 0);
+		Timestamp start = new Timestamp(cal.getTimeInMillis());
+
+		cal.add(Calendar.DAY_OF_YEAR, 1);
+		Timestamp end = new Timestamp(cal.getTimeInMillis());
+
+		// Build resource name map
+		Map<Integer, String> resourceNameMap = new HashMap<>();
+		if (groups != null) {
+			for (Group g : groups) {
+				try {
+					resourceNameMap.put(Integer.valueOf(g.getId()), g.getContent());
+				} catch (NumberFormatException e) {
+					// Ignore invalid IDs
+				}
+			}
+		}
+
+		List<MResourceAssignment> bookings = fetchBookings(start, end);
+
+		StringBuilder html = new StringBuilder();
+
+		// Determine view range based on toggle
+		boolean workHoursOnly = chkWorkHours != null && chkWorkHours.isChecked();
+		int startHour = workHoursOnly ? 8 : 0;
+		int endHour = workHoursOnly ? 18 : 23;
+		int hourCount = endHour - startHour + 1;
+		int pxPerHour = 40;
+		int heightPx = hourCount * pxPerHour;
+
+		html.append("<div class='week-view-root' data-start-hour='" + startHour + "'>");
+
+		// Header
+		html.append("<div class='week-header'>");
+
+		// Show the date in the time spacer
+		SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy/MM/dd (EEE)");
+		cal.setTime(start);
+		html.append("<div class='header-time-spacer' style='font-size:11px; line-height:40px;'>")
+				.append(sdfDate.format(cal.getTime()))
+				.append("</div>");
+
+		// One header column per resource (room)
+		SimpleDateFormat sdfKey = new SimpleDateFormat("yyyy-MM-dd");
+		String dayKey = sdfKey.format(start);
+
+		if (groups != null) {
+			for (Group g : groups) {
+				int resId = Integer.valueOf(g.getId());
+				String color = getResourceColor(resId);
+				html.append("<div class='header-day' style='color:").append(color).append(";'>")
+						.append(g.getContent())
+						.append("</div>");
+			}
+		}
+
+		html.append("</div>"); // End Header
+
+		html.append("<div class='scroll-body'>");
+		html.append("<div class='week-layout' style='min-height: " + heightPx + "px;'>");
+
+		// Time Column
+		html.append("<div class='time-col'>");
+		for (int i = startHour; i <= endHour; i++) {
+			html.append("<div class='time-slot'>").append(String.format("%02d:00", i)).append("</div>");
+		}
+		html.append("</div>");
+
+		// Days Grid — one column per resource
+		html.append("<div class='days-grid'>");
+
+		if (groups != null) {
+			for (Group g : groups) {
+				int resourceId = Integer.valueOf(g.getId());
+				html.append("<div class='day-col' data-date='" + dayKey + "' data-resource-id='" + resourceId
+						+ "' style='height: " + heightPx + "px;'>");
+
+				// 1. Filter bookings for this resource
+				List<MResourceAssignment> resEvents = new ArrayList<>();
+				for (MResourceAssignment b : bookings) {
+					if (b.getS_Resource_ID() == resourceId) {
+						resEvents.add(b);
+					}
+				}
+
+				// 2. Sort by start time, then end time
+				Collections.sort(resEvents, new Comparator<MResourceAssignment>() {
+					public int compare(MResourceAssignment o1, MResourceAssignment o2) {
+						int val = o1.getAssignDateFrom().compareTo(o2.getAssignDateFrom());
+						if (val == 0)
+							return o2.getAssignDateTo().compareTo(o1.getAssignDateTo());
+						return val;
+					}
+				});
+
+				// 3. Pack into columns (simple greedy algorithm)
+				List<List<MResourceAssignment>> columns = new ArrayList<>();
+				for (MResourceAssignment evt : resEvents) {
+					boolean placed = false;
+					for (List<MResourceAssignment> col : columns) {
+						MResourceAssignment last = col.get(col.size() - 1);
+						if (evt.getAssignDateFrom().getTime() >= last.getAssignDateTo().getTime()) {
+							col.add(evt);
+							placed = true;
+							break;
+						}
+					}
+					if (!placed) {
+						List<MResourceAssignment> newCol = new ArrayList<>();
+						newCol.add(evt);
+						columns.add(newCol);
+					}
+				}
+
+				// 4. Render columns
+				int numCols = columns.size();
+				double colWidthPercent = 95.0 / (numCols > 0 ? numCols : 1);
+
+				boolean canWrite = isWritable();
+				int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
+
+				for (int colIndex = 0; colIndex < numCols; colIndex++) {
+					List<MResourceAssignment> col = columns.get(colIndex);
+					for (MResourceAssignment b : col) {
+						long startMs = b.getAssignDateFrom().getTime();
+						long endMs = b.getAssignDateTo().getTime();
+
+						// Calculate offset from day start
+						Calendar dayStart = Calendar.getInstance();
+						dayStart.setTime(b.getAssignDateFrom());
+						dayStart.set(Calendar.HOUR_OF_DAY, startHour);
+						dayStart.set(Calendar.MINUTE, 0);
+						dayStart.set(Calendar.SECOND, 0);
+
+						long offsetMs = startMs - dayStart.getTimeInMillis();
+						long durationMs = endMs - startMs;
+
+						double pxPerMin = 40.0 / 60.0;
+						double top = (offsetMs / 60000.0) * pxPerMin;
+						double height = (durationMs / 60000.0) * pxPerMin;
+						if (height < 15)
+							height = 15;
+
+						double left = 2.0 + (colIndex * colWidthPercent);
+						double width = colWidthPercent - 2.0;
+
+						MUser user = new MUser(Env.getCtx(), b.getCreatedBy(), null);
+
+						String resName = resourceNameMap.getOrDefault(b.getS_Resource_ID(), "");
+						if (!resName.isEmpty())
+							resName = "[" + resName + "] ";
+						String title = resName + b.getName() + " (" + user.getName() + ")";
+
+						String evtColor = getResourceColor(b.getS_Resource_ID());
+						String displayContent = title;
+						if (b.getDescription() != null && !b.getDescription().isEmpty()) {
+							displayContent += "<br/><span style='font-size:10px; opacity:0.9;'>" + b.getDescription()
+									+ "</span>";
+						}
+
+						boolean isOwnerOrAdmin = canWrite || b.getCreatedBy() == adUserId;
+						String deleteIconHtml = "";
+						if (isOwnerOrAdmin) {
+							deleteIconHtml = String.format(
+									"<span class='delete-icon' onclick='window.onWeekEventDelete(event, %d)'>&times;</span>",
+									b.getS_ResourceAssignment_ID());
+						}
+
+						String nameJS = b.getName().replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"");
+						String descJS = "";
+						if (b.getDescription() != null) {
+							descJS = b.getDescription().replace("\r", "").replace("\n", " ").replace("\\", "\\\\")
+									.replace("'", "\\'").replace("\"", "\\\"");
+						}
+
+						String editableClass = isOwnerOrAdmin ? "editable" : "";
+						String resizeHandleHtml = isOwnerOrAdmin ? "<div class='resize-handle'></div>" : "";
+
+						html.append(String.format(
+								"<div class='event-card %s' style='top:%.1fpx; height:%.1fpx; background-color:%s; width:%.1f%%; left:%.1f%%;' "
+										+ "data-id='%d' data-resource-id='%d' data-start-ms='%d' data-end-ms='%d' "
+										+ "onclick=\"onWeekEventClick(event, '%s', '%s', '%s', '%s', %s, %s);\">"
+										+ "%s%s%s</div>",
+								editableClass, top, height, evtColor, width, left,
+								b.getS_ResourceAssignment_ID(), b.getS_Resource_ID(), startMs, endMs,
+								b.getS_ResourceAssignment_ID(), nameJS, descJS,
+								b.getS_Resource_ID(), startMs, endMs, displayContent, deleteIconHtml,
+								resizeHandleHtml));
+					}
+				}
+
+				html.append("</div>"); // day-col
+			}
+		}
+
+		// Add Current Time Indicator Line
+		html.append("<div class='current-time-line'></div>");
+
+		html.append("</div>"); // days-grid
+		html.append("</div>"); // week-layout
+		html.append("</div>"); // scroll-body
+		html.append("</div>"); // root
+
 		Html zkHtml = new Html();
-		zkHtml.setContent("<div style='padding:20px;'>Day View coming soon</div>");
+		zkHtml.setHflex("1");
+		zkHtml.setVflex("1");
+		zkHtml.setContent(html.toString());
 		bookingContainer.appendChild(zkHtml);
 	}
 
