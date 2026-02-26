@@ -1,6 +1,6 @@
 # Booking Plugin Technical Guide
 
-**Version:** 3.31 | **Updated:** 2026-02-26
+**Version:** 3.32 | **Updated:** 2026-02-26
 
 ## 1. Overview
 
@@ -401,3 +401,4 @@ User clicks delete icon or dialog Delete button
 | **3.2x** | Drag-and-drop for Week View (create, move, resize). Timezone fix for drag-and-drop operations. Name validation on booking form. Permission restriction: drag/resize limited to Creator or Admin. Work Hours toggle checkbox (08:00–18:00 vs 00:00–23:00). |
 | **3.30** | Added **Day View** (single-day, resource-as-columns). Removed Month View. Reordered toolbar buttons to Week \| Day \| Timeline. Week View changed to **Mon–Fri** (5-day) to match Flutter app. |
 | **3.31** | Code refactoring: extracted shared helpers (`buildResourceNameMap`, `sortAndPackEvents`, `renderEventCards`, `appendViewFooter`). Removed dead code (`convertTimestamp`, `draw`, unused imports). Fixed duplicate `getFellow` calls, cleaned up unused variables and stale comments. |
+| **3.32** | Backend 權限檢查：`deleteBooking`、`updateBooking`（Dialog）、`updateBooking`（Drag-and-Drop）加入 `CreatedBy == AD_User_ID || isWritable()` 驗證。刪除失敗時顯示 Permission denied 通知。Technical guide Section 6 重寫為完整權限模型文件。 |

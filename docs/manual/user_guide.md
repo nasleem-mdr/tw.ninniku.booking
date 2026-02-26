@@ -1,6 +1,6 @@
 # Booking System User Manual
 
-**Version:** 3.31 | **Updated:** 2026-02-26
+**Version:** 3.32 | **Updated:** 2026-02-26
 
 ## 1. Introduction
 
@@ -20,7 +20,7 @@ Located at the top of the window:
 
 | Element | Description |
 |---------|-------------|
-| **Version** | Displays the current system version (e.g. 3.31). |
+| **Version** | Displays the current system version (e.g. 3.32). |
 | **Refresh** | Reloads the latest data from the database. |
 | **Resource** | Dropdown to select the type of resource (e.g. "Meeting Room", "Car"). |
 | **View Modes** | **Week** \| **Day** \| **Timeline** — switch between views. |
@@ -152,3 +152,4 @@ Located at the top of the window:
 | **3.2x** | Drag-and-drop booking in Week View (create, move, resize). Timezone fix for drag-and-drop. Name validation in Week View. Permission restriction: drag/resize limited to Creator or Admin. Work Hours toggle (08:00–18:00 vs full day). |
 | **3.30** | Added **Day View** (single-day, resource-as-columns). Removed Month View. Reordered view buttons to Week \| Day \| Timeline. Week View changed to **Mon–Fri** (5-day) to match Flutter app. |
 | **3.31** | Code refactoring: extracted shared helpers (`buildResourceNameMap`, `sortAndPackEvents`, `renderEventCards`). Removed dead code. Fixed duplicate code and stale comments. |
+| **3.32** | Backend 權限檢查：刪除、更新、拖曳操作加入 Creator / Admin Role 驗證。 |
