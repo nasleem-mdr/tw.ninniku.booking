@@ -156,7 +156,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			JSONObject json = new JSONObject(itemData.getValue());
 
 			if (!deleteBooking(json)) {
-
+				Clients.showNotification(errorMessage);
 			}
 			refreshView();
 
@@ -233,6 +233,11 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		int id = Integer.valueOf((String) json.get("id"));
 		if (id > 0) {
 			MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id, null);
+			int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
+			if (!isWritable() && booking.getCreatedBy() != adUserId) {
+				errorMessage = "Permission denied: only the creator or admin can delete this booking.";
+				return false;
+			}
 			booking.delete(true);
 			return true;
 		}
@@ -254,6 +259,16 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				} catch (NumberFormatException e) {
 					// Invalid format, use 0
 				}
+			}
+		}
+
+		// Permission check for existing bookings
+		if (id > 0) {
+			MResourceAssignment existing = new MResourceAssignment(Env.getCtx(), id, null);
+			int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
+			if (!isWritable() && existing.getCreatedBy() != adUserId) {
+				errorMessage = "Permission denied: only the creator or admin can update this booking.";
+				return false;
 			}
 		}
 
@@ -354,6 +369,11 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			return false; // Cannot update a non-existent booking, prevents NULL Name error on insert
 
 		MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), s_Booking_ID, null);
+
+		int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
+		if (!isWritable() && booking.getCreatedBy() != adUserId) {
+			return false;
+		}
 
 		booking.setAssignDateFrom(ds);
 		booking.setAssignDateTo(de);

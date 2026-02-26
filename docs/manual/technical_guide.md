@@ -196,28 +196,124 @@ Each card receives:
 
 ## 6. Permissions Model
 
-### 6.1. Form Access
+Booking 的操作權限採用**雙層檢查**機制：UI 層（前端）阻擋非授權使用者的互動元素，Backend 層（Java）在實際執行前再次驗證，防止繞過 UI 的請求。
 
-Determined by `AD_Form_Access` table:
+### 6.1. 管理者判定 (`isWritable()`)
+
+「管理者」的定義為：**使用者的 Role 對此 Booking Form 具有 Read/Write 存取權限**。
 
 ```java
-boolean isWritable() {
-    // Query: SELECT isreadwrite FROM AD_Form_Access
-    //        WHERE ad_role_id = ? AND ad_form_id = ?
+private boolean isWritable() {
+    String sql = "SELECT isreadwrite FROM AD_Form_Access "
+               + "WHERE ad_role_id = ? AND ad_form_id = ?";
+    String result = DB.getSQLValueString(null, sql,
+        new Object[] { Env.getCtx().getProperty("#AD_Role_ID"), getAdFormId() });
     return "Y".equals(result);
 }
 ```
 
-### 6.2. Per-Event Permissions
+* 查詢 `AD_Form_Access` 表，以當前 `AD_Role_ID` + `AD_Form_ID` 為條件。
+* `IsReadWrite = 'Y'` → 管理者（可操作所有人的預約）。
+* `IsReadWrite = 'N'` 或無記錄 → 一般使用者（只能操作自己的預約）。
+* 此設定可在 iDempiere **Role** 視窗 → **Form Access** 頁籤中針對每個 Role 個別調整。
 
-Each event card checks:
+### 6.2. 操作權限規則
+
+每個預約（Event）的可操作判定公式：
 
 ```
-canModify = isWritable() || (event.CreatedBy == currentUserId)
+canModify = isWritable() || (booking.CreatedBy == @#AD_User_ID@)
 ```
 
-* **canModify = true**: Card is `.editable`, drag/resize/delete enabled.
-* **canModify = false**: Card is read-only, click opens view-only dialog.
+| 角色 | 條件 | 可執行操作 |
+|------|------|-----------|
+| **管理者** | `AD_Form_Access.IsReadWrite = 'Y'` | 拖曳、調整大小、刪除、編輯**所有人**的預約 |
+| **建立者** | `booking.CreatedBy == @#AD_User_ID@` | 拖曳、調整大小、刪除、編輯**自己**的預約 |
+| **其他使用者** | 以上兩者皆不符合 | 僅能**檢視**預約，無法修改或刪除 |
+
+### 6.3. UI 層控制（前端）
+
+權限在三個 View 中以不同方式控制前端互動元素的顯示：
+
+**Week View & Day View** — `renderEventCards()` (BookingTimeline.java):
+
+| `canModify` | `.editable` CSS class | Delete icon (`×`) | Resize handle | Drag-to-Move |
+|-------------|----------------------|-------------------|---------------|-------------|
+| `true` | 加上 | 顯示 | 顯示 | 可拖曳 |
+| `false` | 不加 | 不顯示 | 不顯示 | 不可拖曳 |
+
+* JS 端的 Move handler 額外檢查 `.editable` class，沒有此 class 的卡片無法發起拖曳。
+* Resize handler 綁定在 `.resize-handle` 元素上，該元素只在 `canModify = true` 時才會被 render。
+
+**Timeline View** — `getBookingJSON()` (BookingTimeline.java):
+
+* 每個 vis.js item 的 `editable` flag 在 Java 端根據 `canModify` 設定。
+* vis.js options 中 `overrideItems: false`，確保全域設定不會覆蓋 per-item 的 `editable` flag。
+* `editable = false` 的 item 無法被拖曳、resize 或透過 vis.js 刪除。
+
+### 6.4. Backend 層控制（Java）
+
+即使前端被繞過，Backend 在實際執行 CRUD 操作前會再次驗證權限：
+
+**`deleteBooking(JSONObject json)`** — 刪除預約：
+
+```java
+MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id, null);
+int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
+if (!isWritable() && booking.getCreatedBy() != adUserId) {
+    // 拒絕：非管理者且非建立者
+    return false;
+}
+booking.delete(true);
+```
+
+**`updateBooking(JSONObject json)`** — 透過 Dialog 更新預約：
+
+```java
+if (id > 0) {
+    MResourceAssignment existing = new MResourceAssignment(Env.getCtx(), id, null);
+    int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
+    if (!isWritable() && existing.getCreatedBy() != adUserId) {
+        // 拒絕：非管理者且非建立者
+        return false;
+    }
+}
+```
+
+**`updateBooking(int, int, Timestamp, Timestamp)`** — 透過 Drag-and-Drop 更新預約：
+
+```java
+MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), s_Booking_ID, null);
+int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
+if (!isWritable() && booking.getCreatedBy() != adUserId) {
+    return false;
+}
+```
+
+**新增預約（`id == 0`）不需要權限檢查**，所有使用者皆可建立。
+
+### 6.5. 權限檢查流程圖
+
+```
+使用者操作 (Drag / Delete / Edit)
+  │
+  ├─ UI 層檢查
+  │   ├─ Week/Day: .editable class? delete icon 存在?
+  │   └─ Timeline: item.editable flag?
+  │   │
+  │   └─ 不通過 → 操作被前端阻擋（無互動元素）
+  │
+  └─ 通過 → JS 送出請求到 Java Backend
+      │
+      ├─ Backend 權限檢查
+      │   └─ isWritable() || CreatedBy == AD_User_ID ?
+      │   │
+      │   └─ 不通過 → 回傳 false，顯示 "Permission denied" 通知
+      │
+      └─ 通過 → 執行 save() / delete()
+          │
+          └─ 業務驗證 (時間重疊檢查等)
+```
 
 ## 7. Data Flow
 
