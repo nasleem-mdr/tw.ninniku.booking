@@ -39,4 +39,18 @@ public class BookingValidator {
                 .replace("\n", "\\n")
                 .replace("\r", "");  // strip CR; not escaped, intentionally removed
     }
+
+    /**
+     * Escapes a string for safe embedding in HTML content (text nodes and attribute values).
+     * Returns "" for null input.
+     */
+    public static String escapeForHtml(String value) {
+        if (value == null) return "";
+        return value
+            .replace("&", "&amp;")   // must be first
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+            .replace("\"", "&quot;")
+            .replace("'", "&#x27;");
+    }
 }

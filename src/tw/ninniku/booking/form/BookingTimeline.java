@@ -49,7 +49,7 @@ import tw.ninniku.timeline.Item;
 public class BookingTimeline extends ADForm implements IFormController, EventListener<Event>, ValueChangeListener {
 
 	private static final long serialVersionUID = 1L;
-	private ArrayList<Group> groups;
+	private List<Group> groups;
 	String version = "3.32";
 	Textbox dateStart;
 	Textbox dateEnd;
@@ -418,7 +418,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		Listitem item = resourceType.getSelectedItem();
 		if (item == null) return new Gson().toJson(new ArrayList<Group>());
 		int resourceTypeId = Integer.parseInt((String) item.getId());
-		groups = (ArrayList<Group>) bookingService.fetchGroups(resourceTypeId);
+		groups = bookingService.fetchGroups(resourceTypeId);
 		return new Gson().toJson(groups);
 	}
 
@@ -646,13 +646,13 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 				String resName = resourceNameMap.getOrDefault(b.getS_Resource_ID(), "");
 				if (!resName.isEmpty())
-					resName = "[" + resName + "] ";
-				String title = resName + b.getName() + " (" + user.getName() + ")";
+					resName = "[" + BookingValidator.escapeForHtml(resName) + "] ";
+				String title = resName + BookingValidator.escapeForHtml(b.getName()) + " (" + BookingValidator.escapeForHtml(user.getName()) + ")";
 
 				String color = getResourceColor(b.getS_Resource_ID());
 				String displayContent = title;
 				if (b.getDescription() != null && !b.getDescription().isEmpty()) {
-					displayContent += "<br/><span style='font-size:10px; opacity:0.9;'>" + b.getDescription()
+					displayContent += "<br/><span style='font-size:10px; opacity:0.9;'>" + BookingValidator.escapeForHtml(b.getDescription())
 							+ "</span>";
 				}
 
