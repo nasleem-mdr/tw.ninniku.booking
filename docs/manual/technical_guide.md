@@ -1,6 +1,6 @@
 # Booking Plugin Technical Guide
 
-**Version:** 3.32 | **Updated:** 2026-02-26
+**Version:** 3.33 | **Updated:** 2026-03-26
 
 ## 1. Overview
 
@@ -15,7 +15,7 @@ The `tw.ninniku.booking` plugin provides a graphical resource booking interface 
 | **Timeline Visualization** | vis.js (Vis Timeline) |
 | **Dialogs & Interactions** | jQuery / jQuery UI |
 | **Week/Day View Rendering** | Server-side HTML generation (Java → ZK Html component) |
-| **Week/Day View Interactions** | Inline JavaScript (IIFE in meetingroom.zul) |
+| **Week/Day View Interactions** | `BookingApp.WeekView` IIFE in `booking_weekview.js` |
 | **Styles** | Inline CSS in ZUL + ZK native components |
 | **Database** | PostgreSQL / Oracle (standard iDempiere DBs) |
 | **Tables** | `S_Resource`, `S_ResourceType`, `S_ResourceAssignment` |
@@ -26,67 +26,129 @@ The `tw.ninniku.booking` plugin provides a graphical resource booking interface 
 tw.ninniku.booking/
 ├── src/tw/ninniku/booking/
 │   ├── form/
-│   │   └── BookingTimeline.java      # Main controller (ADForm)
+│   │   ├── BookingTimeline.java          # Main controller (ADForm) — thin event wiring only
+│   │   ├── BookingDTO.java               # Typed DTO replacing raw JSONObject parsing
+│   │   ├── BookingValidationException.java # Checked exception for user-facing errors
+│   │   ├── BookingValidator.java         # Business rule validation + JS/HTML escaping
+│   │   └── BookingService.java           # CRUD business logic; owns transaction lifecycle
 │   └── model/
-│       ├── MResourceAssignment.java   # Extended model with overlap check
-│       └── MBooking.java              # Booking-specific model logic
-├── src/web/
-│   ├── meetingroom.zul                # Main UI (English)
-│   └── meetingroom_tw.zul             # Main UI (Traditional Chinese)
-├── js/
-│   ├── booking.js                     # Timeline client-side logic
-│   ├── booking_weekview.js            # Week/Day view event handlers
-│   ├── vis-timeline-graph2d.min.js    # Vis.js library
-│   └── ...
-├── styles/                            # CSS styling
-├── META-INF/MANIFEST.MF              # OSGi bundle definition
-├── OSGI-INF/                          # Service component definitions
+│       ├── MResourceAssignment.java      # Extended model with overlap check
+│       └── MBooking.java                 # Booking-specific model logic
+├── WEB-INF/web/
+│   ├── meetingroom.zul                   # Main UI (English) — no inline script
+│   ├── meetingroom_tw.zul                # Main UI (Traditional Chinese)
+│   └── js/
+│       ├── booking.js                    # BookingApp.Timeline IIFE — Timeline view logic
+│       ├── booking_weekview.js           # BookingApp.WeekView IIFE — Week/Day view logic
+│       ├── vis-timeline-graph2d.min.js   # Vis.js library
+│       └── ...
+├── META-INF/MANIFEST.MF                  # OSGi bundle definition
+├── OSGI-INF/                             # Service component definitions
 └── docs/
-    ├── manual/                        # User & technical guides
-    └── plans/                         # Design & implementation plans
+    ├── manual/                           # User & technical guides
+    └── superpowers/                      # Design specs & implementation plans
 ```
 
 ## 4. Key Components
 
 ### 4.1. Controller: `BookingTimeline.java`
 
-Implements `ADForm` and acts as the bridge between the backend database and the frontend ZUL/JS.
+Implements `ADForm`. After the 3.33 refactor it is a **thin event-wiring layer** — no direct DB access, no transaction management, no inline JSON parsing.
 
 **Responsibilities:**
 
-1. **Initialization** — Loads `meetingroom.zul`, initializes UI components (toolbar, dropdowns, buttons, checkbox).
-2. **Data Loading** — Queries `S_ResourceAssignment` and `S_Resource` tables.
-3. **JSON Generation** — Converts DB records into JSON for `vis.js` (Timeline) or HTML rendering (Week/Day).
-4. **View Rendering** — `renderWeekView()` and `renderDayView()` generate complete HTML strings server-side, injected via ZK `Html` component.
-5. **Event Handling** — Listens for ZK events (button clicks, checkbox change) and hidden field `onChange` events (triggered by JS for CRUD).
-6. **Persistence** — Saves/Updates/Deletes records using `MResourceAssignment`, with transaction management and overlap checks.
+1. **Initialization** — Loads `meetingroom.zul`, initializes UI components, instantiates `BookingService`.
+2. **Event Handling** — Listens for ZK events (button clicks, checkbox change) and hidden field `onChange` events (triggered by JS for CRUD).
+3. **Delegation** — Passes all CRUD operations to `BookingService`; parses incoming JSON via `BookingDTO.fromJson()`.
+4. **View Rendering** — `renderWeekView()` and `renderDayView()` generate HTML strings; `renderEventCards()` escapes user data via `BookingValidator`.
+5. **Error display** — Catches `BookingValidationException` and shows `Clients.showNotification()`.
 
 **Key Methods:**
 
 | Method | Description |
 |--------|-------------|
-| `initForm()` | Initialize UI, wire event listeners, load first view. |
+| `initForm()` | Initialize UI, wire event listeners, instantiate BookingService, load first view. |
 | `refreshView()` | Re-render the current view mode (Timeline, Week, or Day). |
 | `renderWeekView()` | Build 5-day (Mon–Fri) HTML grid with event cards. |
 | `renderDayView()` | Build single-day HTML grid with resource-as-columns. |
 | `buildResourceNameMap()` | Create `Map<Integer, String>` of resource ID → name. |
 | `sortAndPackEvents()` | Pack overlapping events into non-overlapping columns. |
-| `renderEventCards()` | Render positioned, styled, permission-aware event cards. |
+| `renderEventCards()` | Render positioned, styled, permission-aware event cards using `BookingValidator.escapeForHtml/Js()`. |
 | `appendViewFooter()` | Close divs, add current-time indicator, inject HTML into ZK. |
-| `updateBooking(JSONObject)` | Validate, save, and handle weekly repetition. |
-| `deleteBooking(JSONObject)` | Validate and delete a booking. |
 | `getBookingJSON()` | Generate vis.js-compatible JSON for Timeline view. |
-| `fetchBookings()` | Query bookings for a custom date range (Week/Day views). |
-| `getResourceJSON()` | Load all resources of the selected type. |
+| `fetchBookings()` | Delegate to `BookingService.fetchBookings()` for a custom date range. |
+| `getResourceJSON()` | Delegate to `BookingService.fetchGroups()` for the selected resource type. |
 | `isWritable()` | Check if current user's role has Read/Write access to the form. |
 
-### 4.2. View: `meetingroom.zul` / `meetingroom_tw.zul`
+**Removed in 3.33:** `updateBooking(JSONObject)`, `updateBooking(int, int, Timestamp, Timestamp)`, `deleteBooking(JSONObject)`, `isInteger(String)`, `errorMessage` field.
+
+### 4.2. BookingDTO
+
+**File:** `src/tw/ninniku/booking/form/BookingDTO.java`
+
+Typed, immutable data transfer object. Replaces all raw `JSONObject` parsing at call sites.
+
+**Fields:**
+
+| Field | Type | JSON Key | Notes |
+|-------|------|---------|-------|
+| `bookingId` | `int` | `"s_booking_id"` | 0 = new record |
+| `groupResourceId` | `int` | `"group"` | vis.js group ID |
+| `sResourceId` | `int` | `"s_resource_id"` | iDempiere S_Resource_ID |
+| `name` | `String` | `"booking-name"` | required, non-blank |
+| `description` | `String` | `"description"` | optional |
+| `startTime` | `Timestamp` | `"startTimestamp"` | epoch ms |
+| `endTime` | `Timestamp` | `"endTimestamp"` | epoch ms |
+| `assignFrom` | `Timestamp` | `"assign-date-from-timestamp"` | epoch ms |
+| `assignTo` | `Timestamp` | `"assign-date-to-timestamp"` | epoch ms |
+| `isWeekly` | `boolean` | `"is-weekly"` | `"Y"` or absent |
+| `weeklyEndDate` | `Timestamp` | `"repeat-date-to-timestamp"` | null if !isWeekly |
+
+**Factory:** `BookingDTO.fromJson(String raw)` — wraps all `JSONException` as `BookingValidationException("Invalid form data")`. Uses `optString()`/`optLong()` throughout; never raw casts.
+
+### 4.3. BookingValidationException
+
+**File:** `src/tw/ninniku/booking/form/BookingValidationException.java`
+
+Checked exception carrying a user-facing message string. Thrown by `BookingDTO.fromJson()`, `BookingValidator.validate()`, and permission checks in `BookingService`. Caught in `BookingTimeline.onEvent()` and displayed via `Clients.showNotification()`.
+
+### 4.4. BookingValidator
+
+**File:** `src/tw/ninniku/booking/form/BookingValidator.java`
+
+All validation rules and output-escaping in one place.
+
+| Method | Purpose |
+|--------|---------|
+| `validate(BookingDTO dto)` | Checks: name non-blank, startTime < endTime, weeklyEndDate non-null and after endTime when isWeekly. |
+| `escapeForJs(String value)` | Escapes for JS string literals in `onclick` attributes. Order: `\` → `'` → `"` → `\n` → `\r`. Returns `""` for null. |
+| `escapeForHtml(String value)` | Escapes for HTML text nodes. Order: `&` → `<` → `>` → `"` → `'`. Returns `""` for null. |
+
+### 4.5. BookingService
+
+**File:** `src/tw/ninniku/booking/form/BookingService.java`
+
+All CRUD business logic extracted from the controller. Owns the transaction lifecycle.
+
+| Method | Description |
+|--------|-------------|
+| `saveBooking(BookingDTO, boolean isAdmin, int currentUserId)` | Create or update booking; weekly recurrence all-or-nothing within one `Trx`. |
+| `updateBookingTime(int, int, Timestamp, Timestamp, boolean, int)` | Drag-drop time update; auto-commit single record. |
+| `deleteBooking(int, boolean, int)` | Permission check then `booking.delete(true)`. |
+| `fetchBookings(int resourceTypeId, Timestamp, Timestamp)` | Query `S_ResourceAssignment` within time window. |
+| `fetchGroups(int resourceTypeId)` | Load resources via `PreparedStatement`; returns `List<Group>`. |
+
+**Transaction contract:** `saveBooking` and `deleteBooking` call `Trx.get()` → `commit()` on success → `rollback()` + `close()` on any exception. `fetchBookings` and `fetchGroups` use the default auto-commit connection.
+
+**Permission contract:** `saveBooking`, `updateBookingTime`, and `deleteBooking` accept `boolean isAdmin` and `int currentUserId` (resolved from `isWritable()` and `Env.getContextAsInt(ctx, "#AD_User_ID")` in the controller). They throw `BookingValidationException` for permission failures.
+
+### 4.6. View: `meetingroom.zul` / `meetingroom_tw.zul`
 
 Defines the layout using ZK's Native namespace (`xmlns:n="native"`) to embed raw HTML.
 
 **Structure:**
 
-* **Toolbar** — Version, view buttons (Week \| Day \| Timeline), resource dropdown, Add Booking, navigation, work hours checkbox, Refresh.
+* **Toolbar** — Version (read from OSGi bundle), view buttons (Week \| Day \| Timeline), resource dropdown, Add Booking, navigation, work hours checkbox, Refresh.
 * **Booking Container** — A `div` that hosts either vis.js Timeline or server-rendered HTML for Week/Day.
 * **Hidden Form (`#update-form`)** — jQuery UI dialog for booking details (Subject, Memo, Date Range, Recurring options).
 * **Hidden Data Fields** — `visible="false"` textboxes acting as JS→Java communication channel:
@@ -94,60 +156,66 @@ Defines the layout using ZK's Native namespace (`xmlns:n="native"`) to embed raw
   * `bookingDeleted` — triggers delete flow
   * `itemData` — carries JSON payload
 
-**Inline JavaScript (IIFE):**
+**As of 3.33:** The ZUL file contains **no inline `<script>` logic**. All JS is in external files loaded via `<script src="...">` tags.
 
-The ZUL file contains ~400 lines of inline JS implementing the Week/Day view drag-and-drop system:
+### 4.7. Client Logic: `booking.js` / `booking_weekview.js`
 
-| Mode | Trigger | Behavior |
-|------|---------|----------|
-| **CREATE** | Click + drag on empty `.day-col` area | Blue ghost rectangle, 30-min snap, opens booking dialog with pre-filled range. |
-| **MOVE** | Click + drag on `.event-card.editable` | Ghost clone follows cursor, column detection via `elementFromPoint()`, 30-min snap, auto-save. |
-| **RESIZE** | Click + drag on `.resize-handle` | Extend/shorten card height, 30-min snap to end time, auto-save. |
+Both files use IIFE namespace pattern to avoid global variable pollution.
 
-**Helper Functions in JS:**
+**`booking.js` → `BookingApp.Timeline`**
 
-| Function | Purpose |
-|----------|---------|
-| `getTimeFromY(y)` | Convert Y pixel position to datetime. |
-| `snapTo30(date)` | Round to nearest 30-minute boundary. |
-| `formatTime(date)` | Format as "HH:MM". |
-| `formatDuration(ms)` | Format as "Xh Ym". |
-| `triggerUpdate(json)` | Write JSON to hidden fields, fire ZK change event. |
+Owns Timeline-view-specific symbols. Public API:
 
-### 4.3. Client Logic: `booking.js` / `booking_weekview.js`
+| Symbol | Purpose |
+|--------|---------|
+| `initChart()` | Initialize vis.js Timeline instance. |
+| `drawChart()` | Refresh Timeline data and redraw. |
+| `setGroups(g)` | Update vis.js groups array. |
+| `setItems(data)` | Replace vis.js items DataSet. |
+| `getGroups()` | Return current groups array (used by WeekView). |
+| `clickNew(item, cb)` | Open new booking dialog. |
+| `openEditDialog(item, cb)` | Open edit dialog with pre-filled data. |
 
-* **`booking.js`** — Configures vis.js Timeline, handles Timeline-specific drag-and-drop and click events.
-* **`booking_weekview.js`** — Handles event card click (`onWeekEventClick`), new booking click (`onWeekDayClick`), and edit/delete dialog management.
+**`booking_weekview.js` → `BookingApp.WeekView`**
 
-**Dialog Functions:**
+Owns all Week/Day view symbols. Public API:
 
-| Function | Purpose |
-|----------|---------|
-| `clickNew()` | Open new booking dialog, show recurrence fields. |
-| `openEditDialog()` | Open edit dialog with pre-filled data, hide recurrence fields. |
-| `openCustomAddDialogRange(start, end, resourceId)` | Wrapper for drag-to-create completion. |
-| `openCustomEditDialog(eventData)` | Wrapper for event card click. |
+| Symbol | Purpose |
+|--------|---------|
+| `clickNew(item, cb)` | Open new booking dialog (delegates to BookingApp.Timeline). |
+| `openEditDialog(item, cb)` | Open edit dialog (delegates to BookingApp.Timeline). |
+| `openCustomAddDialog(dateStr, minOffset, resId)` | Programmatic open for click-to-create. |
+| `openCustomEditDialog(id, name, desc, resId, startMs, endMs)` | Programmatic open for card click. |
+| `openCustomAddDialogRange(startMs, endMs, resId)` | Open dialog after drag-to-create. |
+| `onWeekDayClick(event, elem, dayKey, resId)` | Column click handler. |
+| `onWeekEventClick(event, id, name, desc, resId, startMs, endMs)` | Event card click handler. |
+| `onWeekEventDelete(event, id)` | Delete icon click handler. |
+| `weekViewScrollTo8Am()` | Scroll view to 08:00. |
+| `updateTimeIndicator()` | Reposition current-time line(s). |
 
-### 4.4. Model: `MResourceAssignment.java`
+Private helpers (not exported): `toTimestamp`, `convertFormToJSON`, `updateMeetingRoomSelector`, `showBeforeDate`, `validateBookingForm`, `initDragEvents`, `getTimeFromY`, `snapTo30`, `formatTime`, `formatDuration`, `getResourceColor`, `updateTooltip`, `triggerUpdate`.
 
-Extends the standard `org.compiere.model.MResourceAssignment`.
+**Script load order** in ZUL: `booking.js` must load before `booking_weekview.js` (WeekView delegates to Timeline at call time).
 
-* **Overlap Check**: `isOverlap()` — queries the database to prevent double-booking of the same resource during the same time slot. Returns `true` if a conflicting assignment exists.
+### 4.8. Model: `MResourceAssignment.java`
+
+Extends `org.compiere.model.MResourceAssignment`.
+
+* **Overlap Check**: `isOverlap()` — queries the DB to prevent double-booking of the same resource. Returns `true` if a conflict exists.
+* **Known Limitation**: The check-then-act pattern is not atomic. Two concurrent saves can both pass `isOverlap()` and both insert. Requires a DB-level unique constraint or advisory lock to fix (out of scope).
 
 ## 5. View Rendering Architecture
 
 ### 5.1. Shared Rendering Pipeline (Week & Day Views)
 
-Both views share the same rendering pipeline via extracted helper methods:
-
 ```
-fetchBookings(startDate, endDate)
+bookingService.fetchBookings(resourceTypeId, start, end)
     ↓
 Filter events by column (day or resource)
     ↓
 sortAndPackEvents(events)          → Pack into non-overlapping columns
     ↓
-renderEventCards(columns, ...)     → Generate positioned HTML cards
+renderEventCards(columns, ...)     → Generate escaped, positioned HTML cards
     ↓
 appendViewFooter(sb, ...)          → Close HTML, add time indicator, inject into ZK
 ```
@@ -171,8 +239,8 @@ Each card receives:
   * Card gets `.editable` CSS class (enables drag cursor).
   * Delete icon (`×`) rendered in top-right corner.
   * Resize handle rendered at bottom.
-* **Content**: Booking name, creator name, memo (truncated).
-* **Click handler**: `onWeekEventClick(id)` to open edit dialog.
+* **Content**: All user-controlled values escaped via `BookingValidator.escapeForHtml()` (card body) and `BookingValidator.escapeForJs()` (`onclick` attributes).
+* **Click handler**: `BookingApp.WeekView.onWeekEventClick(...)` to open edit dialog.
 
 ### 5.4. Week View Specifics
 
@@ -191,7 +259,7 @@ Each card receives:
 ### 5.6. Timeline View
 
 * Rendered entirely client-side using vis.js.
-* Data loaded via `Clients.evalJavaScript()` — JSON arrays of items and groups.
+* Data loaded via `Clients.evalJavaScript()` calling `BookingApp.Timeline.setGroups(...)` and `BookingApp.Timeline.setItems(...)`.
 * Options: editable (add, remove, updateGroup, updateTime), tooltip, snap to 30 min, hidden dates.
 
 ## 6. Permissions Model
@@ -233,8 +301,6 @@ canModify = isWritable() || (booking.CreatedBy == @#AD_User_ID@)
 
 ### 6.3. UI 層控制（前端）
 
-權限在三個 View 中以不同方式控制前端互動元素的顯示：
-
 **Week View & Day View** — `renderEventCards()` (BookingTimeline.java):
 
 | `canModify` | `.editable` CSS class | Delete icon (`×`) | Resize handle | Drag-to-Move |
@@ -242,57 +308,46 @@ canModify = isWritable() || (booking.CreatedBy == @#AD_User_ID@)
 | `true` | 加上 | 顯示 | 顯示 | 可拖曳 |
 | `false` | 不加 | 不顯示 | 不顯示 | 不可拖曳 |
 
-* JS 端的 Move handler 額外檢查 `.editable` class，沒有此 class 的卡片無法發起拖曳。
-* Resize handler 綁定在 `.resize-handle` 元素上，該元素只在 `canModify = true` 時才會被 render。
-
 **Timeline View** — `getBookingJSON()` (BookingTimeline.java):
 
 * 每個 vis.js item 的 `editable` flag 在 Java 端根據 `canModify` 設定。
 * vis.js options 中 `overrideItems: false`，確保全域設定不會覆蓋 per-item 的 `editable` flag。
-* `editable = false` 的 item 無法被拖曳、resize 或透過 vis.js 刪除。
 
 ### 6.4. Backend 層控制（Java）
 
-即使前端被繞過，Backend 在實際執行 CRUD 操作前會再次驗證權限：
+即使前端被繞過，`BookingService` 在實際執行 CRUD 操作前會再次驗證權限：
 
-**`deleteBooking(JSONObject json)`** — 刪除預約：
-
+**`saveBooking(dto, isAdmin, currentUserId)`** — 更新既有預約（id > 0）時：
 ```java
-MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id, null);
-int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
-if (!isWritable() && booking.getCreatedBy() != adUserId) {
-    // 拒絕：非管理者且非建立者
-    return false;
-}
-booking.delete(true);
-```
-
-**`updateBooking(JSONObject json)`** — 透過 Dialog 更新預約：
-
-```java
-if (id > 0) {
-    MResourceAssignment existing = new MResourceAssignment(Env.getCtx(), id, null);
-    int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
-    if (!isWritable() && existing.getCreatedBy() != adUserId) {
-        // 拒絕：非管理者且非建立者
-        return false;
-    }
+if (id > 0 && !isAdmin && existing.getCreatedBy() != currentUserId) {
+    throw new BookingValidationException("Permission denied: ...");
 }
 ```
 
-**`updateBooking(int, int, Timestamp, Timestamp)`** — 透過 Drag-and-Drop 更新預約：
-
+**`updateBookingTime(bookingId, ..., isAdmin, currentUserId)`** — Drag-and-Drop 更新：
 ```java
-MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), s_Booking_ID, null);
-int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
-if (!isWritable() && booking.getCreatedBy() != adUserId) {
-    return false;
+if (!isAdmin && booking.getCreatedBy() != currentUserId) {
+    throw new BookingValidationException("Permission denied: ...");
 }
 ```
 
-**新增預約（`id == 0`）不需要權限檢查**，所有使用者皆可建立。
+**`deleteBooking(bookingId, isAdmin, currentUserId)`** — 刪除：
+```java
+if (!isAdmin && booking.getCreatedBy() != currentUserId) {
+    throw new BookingValidationException("Permission denied: ...");
+}
+```
 
-### 6.5. 權限檢查流程圖
+**新增預約（`bookingId == 0`）不需要權限檢查**，所有使用者皆可建立。
+
+### 6.5. 例外處理對照表
+
+| Exception | 來源 | Controller 動作 |
+|-----------|------|----------------|
+| `BookingValidationException` | `BookingDTO.fromJson()`, `BookingValidator.validate()`, `BookingService` 權限檢查 | Catch → `Clients.showNotification(e.getMessage())` |
+| `AdempiereException` (unchecked) | `BookingService` DB 操作失敗 | 傳播至 ZK 預設錯誤處理器 |
+
+### 6.6. 權限檢查流程圖
 
 ```
 使用者操作 (Drag / Delete / Edit)
@@ -300,19 +355,15 @@ if (!isWritable() && booking.getCreatedBy() != adUserId) {
   ├─ UI 層檢查
   │   ├─ Week/Day: .editable class? delete icon 存在?
   │   └─ Timeline: item.editable flag?
-  │   │
   │   └─ 不通過 → 操作被前端阻擋（無互動元素）
   │
   └─ 通過 → JS 送出請求到 Java Backend
       │
-      ├─ Backend 權限檢查
-      │   └─ isWritable() || CreatedBy == AD_User_ID ?
-      │   │
-      │   └─ 不通過 → 回傳 false，顯示 "Permission denied" 通知
-      │
-      └─ 通過 → 執行 save() / delete()
-          │
-          └─ 業務驗證 (時間重疊檢查等)
+      ├─ BookingDTO.fromJson() — 解析與格式驗證
+      ├─ BookingValidator.validate() — 業務規則驗證
+      └─ BookingService — 權限驗證 + 執行 CRUD
+          └─ 不通過 → BookingValidationException → showNotification
+          └─ 通過 → save() / delete() + refreshView()
 ```
 
 ## 7. Data Flow
@@ -322,9 +373,10 @@ if (!isWritable() && booking.getCreatedBy() != adUserId) {
 ```
 User opens Form
   → BookingTimeline.initForm()
-  → Java queries DB (S_ResourceAssignment, S_Resource)
-  → Timeline: generates JSON, calls Clients.evalJavaScript()
-  → Week/Day: generates HTML string, injects via ZK Html component
+  → bookingService instantiated
+  → Timeline: bookingService.fetchGroups() + getBookingJSON()
+             → Clients.evalJavaScript("BookingApp.Timeline.setGroups(...); BookingApp.Timeline.setItems(...);")
+  → Week/Day: bookingService.fetchBookings() → renderWeekView() / renderDayView()
   → View rendered in browser
 ```
 
@@ -332,25 +384,34 @@ User opens Form
 
 ```
 User action (drag/dialog submit)
-  → JS serializes data to JSON
-  → JS sets hidden textbox value (itemData)
-  → JS fires bookingUpdated.onChange
-  → BookingTimeline.onEvent() intercepts
-  → Java parses JSON, validates (name required, overlap check)
-  → Java saves to S_ResourceAssignment (with transaction)
-  → If weekly repetition: create copies every 7 days until end date
-  → On success: refreshView()
-  → On error: show message, rollback transaction
+  → JS serializes data to JSON → sets itemData hidden field → fires bookingUpdated.onChange
+  → BookingTimeline.onEvent()
+  → BookingDTO.fromJson(raw)           — parse + format validation
+  → BookingValidator.validate(dto)     — business rule validation
+  → bookingService.saveBooking(dto, isAdmin, userId)
+      → permission check (id > 0)
+      → Trx.get() → save records (weekly: loop) → Trx.commit()
+      → on error: rollback + throw AdempiereException
+  → refreshView()
 ```
 
 ### 7.3. Delete Flow
 
 ```
 User clicks delete icon or dialog Delete button
-  → JS serializes {s_booking_id} to JSON
-  → JS fires bookingDeleted.onChange
-  → BookingTimeline.deleteBooking() intercepts
-  → Java validates ID, calls booking.delete(true)
+  → JS fires bookingDeleted.onChange with {id}
+  → bookingService.deleteBooking(bookingId, isAdmin, userId)
+      → permission check → booking.delete(true)
+  → refreshView()
+```
+
+### 7.4. Drag-Drop Time Update Flow
+
+```
+User drags event to new time (Timeline) or Week/Day view auto-save
+  → JS fires dateLast.onChange with {s_booking_id, group, startTimestamp, endTimestamp}
+  → bookingService.updateBookingTime(bookingId, resourceId, start, end, isAdmin, userId)
+      → permission check → booking.setAssignDateFrom/To → booking.save()
   → refreshView()
 ```
 
@@ -400,5 +461,6 @@ User clicks delete icon or dialog Delete button
 | **3.06** | Added delete function in Week View (delete icon on event cards). |
 | **3.2x** | Drag-and-drop for Week View (create, move, resize). Timezone fix for drag-and-drop operations. Name validation on booking form. Permission restriction: drag/resize limited to Creator or Admin. Work Hours toggle checkbox (08:00–18:00 vs 00:00–23:00). |
 | **3.30** | Added **Day View** (single-day, resource-as-columns). Removed Month View. Reordered toolbar buttons to Week \| Day \| Timeline. Week View changed to **Mon–Fri** (5-day) to match Flutter app. |
-| **3.31** | Code refactoring: extracted shared helpers (`buildResourceNameMap`, `sortAndPackEvents`, `renderEventCards`, `appendViewFooter`). Removed dead code (`convertTimestamp`, `draw`, unused imports). Fixed duplicate `getFellow` calls, cleaned up unused variables and stale comments. |
-| **3.32** | Backend 權限檢查：`deleteBooking`、`updateBooking`（Dialog）、`updateBooking`（Drag-and-Drop）加入 `CreatedBy == AD_User_ID || isWritable()` 驗證。刪除失敗時顯示 Permission denied 通知。Technical guide Section 6 重寫為完整權限模型文件。 |
+| **3.31** | Code refactoring: extracted shared helpers (`buildResourceNameMap`, `sortAndPackEvents`, `renderEventCards`, `appendViewFooter`). Removed dead code (`convertTimestamp`, `draw`, unused imports). Fixed duplicate `getFellow` calls. |
+| **3.32** | Backend 權限檢查：`deleteBooking`、`updateBooking`（Dialog）、`updateBooking`（Drag-and-Drop）加入 `CreatedBy == AD_User_ID \|\| isWritable()` 驗證。刪除失敗時顯示 Permission denied 通知。 |
+| **3.33** | 安全性與架構全面重構。新增 `BookingDTO`（型別化 JSON 解析）、`BookingValidationException`、`BookingValidator`（XSS 防護：`escapeForJs` + `escapeForHtml`）、`BookingService`（CRUD 業務層）。`BookingTimeline` 薄化為純事件接線層。`booking.js` 重構為 `BookingApp.Timeline` IIFE；`booking_weekview.js` 重構為 `BookingApp.WeekView` IIFE 並吸收 ZUL inline script（~670 行）。`meetingroom.zul` 移除所有內嵌 JS。Plugin 版本改由 OSGi bundle registry 動態讀取。`pom.xml` Java 版本對齊 17。 |

@@ -1,6 +1,6 @@
 # Booking System User Manual
 
-**Version:** 3.32 | **Updated:** 2026-02-26
+**Version:** 3.33 | **Updated:** 2026-03-26
 
 ## 1. Introduction
 
@@ -10,7 +10,7 @@ The Booking System allows you to manage resource reservations (such as meeting r
 
 1. Log in to iDempiere.
 2. Navigate to the **Booking** form in the menu (location depends on your system configuration).
-3. The main booking window will open, displaying the Timeline view by default.
+3. The main booking window will open, displaying the Week view by default.
 
 ## 3. Interface Overview
 
@@ -20,7 +20,7 @@ Located at the top of the window:
 
 | Element | Description |
 |---------|-------------|
-| **Version** | Displays the current system version (e.g. 3.32). |
+| **Version** | Displays the current system version (read from the installed plugin). |
 | **Refresh** | Reloads the latest data from the database. |
 | **Resource** | Dropdown to select the type of resource (e.g. "Meeting Room", "Car"). |
 | **View Modes** | **Week** \| **Day** \| **Timeline** — switch between views. |
@@ -64,7 +64,7 @@ Located at the top of the window:
 3. Fill in the details:
    * **Resource**: Select the desired resource.
    * **Meeting Subject**: Title of the booking (required).
-   * **Memo**: Additional description/notes.
+   * **Memo**: Additional description/notes (required).
    * **From / To**: Start and end time.
 4. **Recurring Bookings** (optional):
    * Check `Weekly repetition`.
@@ -91,6 +91,8 @@ Located at the top of the window:
 3. Modify the details as needed.
 4. Click **Ok** to save changes.
 
+> **Note**: You can only edit bookings that you created, or all bookings if you have Admin (Read/Write) access.
+
 ### 4.3. Deleting a Booking
 
 **Method 1: Via Edit Dialog**
@@ -101,7 +103,7 @@ Located at the top of the window:
 **Method 2: Delete Icon (Week / Day View)**
 1. Hover over a booking card that you own (or if you have Admin access).
 2. Click the **×** icon in the top-right corner of the card.
-3. Confirm the deletion when prompted.
+3. The booking is deleted immediately.
 
 > **Note**: The delete icon only appears for the booking's creator or users with Admin (Read/Write) access.
 
@@ -138,9 +140,13 @@ Located at the top of the window:
 
 | Scenario | Message / Behavior |
 |----------|-------------------|
-| **Time Overlap** | If you try to create or move a booking to a time slot already occupied by another booking for the same resource, the system shows an error ("Time overlap, update failed") and reverts the change. |
-| **Missing Subject** | The booking name (Subject) is required. The form will highlight the field with a red border if left empty. |
-| **Permission Denied** | If you do not have write access and are not the creator, you cannot move, resize, or delete the booking. The card appears without drag handles or delete icons. |
+| **Time Overlap** | If you try to create or move a booking to a time slot already occupied by another booking for the same resource, the system shows "Time overlap, update failed" and reverts the change. |
+| **Missing Subject** | The Meeting Subject is required. If left empty, an alert will prompt you to enter a value before the form can be submitted. |
+| **Missing Memo** | The Memo field is also required. An alert will prompt you if left empty. |
+| **Invalid Data** | If the submitted form data cannot be parsed (e.g. corrupted time values), the system shows "Invalid form data". |
+| **Time Range Error** | If the end time is not after the start time, the system shows a validation error. |
+| **Weekly End Date Missing** | If "Weekly repetition" is checked but no end date is set, the system shows a validation error. |
+| **Permission Denied** | If you do not have write access and are not the creator, you cannot move, resize, or delete the booking. The card appears without drag handles or delete icons. If the action is attempted anyway, a "Permission denied" notification is shown. |
 
 ## 6. Version History (3.x)
 
@@ -151,5 +157,6 @@ Located at the top of the window:
 | **3.06** | Added delete function in Week View. |
 | **3.2x** | Drag-and-drop booking in Week View (create, move, resize). Timezone fix for drag-and-drop. Name validation in Week View. Permission restriction: drag/resize limited to Creator or Admin. Work Hours toggle (08:00–18:00 vs full day). |
 | **3.30** | Added **Day View** (single-day, resource-as-columns). Removed Month View. Reordered view buttons to Week \| Day \| Timeline. Week View changed to **Mon–Fri** (5-day) to match Flutter app. |
-| **3.31** | Code refactoring: extracted shared helpers (`buildResourceNameMap`, `sortAndPackEvents`, `renderEventCards`). Removed dead code. Fixed duplicate code and stale comments. |
+| **3.31** | Code refactoring: extracted shared helpers. Removed dead code and stale comments. |
 | **3.32** | Backend 權限檢查：刪除、更新、拖曳操作加入 Creator / Admin Role 驗證。 |
+| **3.33** | 內部架構重構（無使用者可見功能變更）。修復：Event card XSS 防護強化（HTML + JS 跳脫）、JSON 解析例外處理、表單驗證訊息更完整（Subject 和 Memo 皆為必填）、Permission denied 訊息更明確。版本號改為動態讀取，不再硬編碼。 |
