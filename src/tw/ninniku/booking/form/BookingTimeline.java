@@ -1,8 +1,5 @@
 package tw.ninniku.booking.form;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 
 import java.util.ArrayList;
@@ -27,7 +24,6 @@ import org.compiere.model.MUser;
 import org.compiere.model.Query;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
-import org.compiere.util.Trx;
 import org.json.JSONObject;
 import org.zkoss.zk.ui.Component;
 import org.zkoss.zk.ui.Executions;
@@ -80,7 +76,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private Timestamp currentViewDate; // Represents the start of the view or 'focus' date
 
-	private String errorMessage = "";
+	private BookingService bookingService;
 
 	@Override
 	public void valueChange(ValueChangeEvent evt) {
@@ -134,29 +130,44 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			currentViewDate = new Timestamp(System.currentTimeMillis());
 			refreshView();
 		} else if (event.getTarget().getId().equals("dateLast")) {
-
-			JSONObject json = new JSONObject(itemData.getValue());
-			Timestamp ds = new Timestamp(Long.valueOf((String) json.get("startTimestamp")));
-			Timestamp de = new Timestamp(Long.valueOf((String) json.get("endTimestamp")));
-
-			int S_Booking_ID = Integer.valueOf((String) json.get("s_booking_id"));
-			int s_recource_id = Integer.valueOf((String) json.get("group"));
-			if (!updateBooking(S_Booking_ID, s_recource_id, ds, de)) {
-				Clients.showNotification("Time overlap, update failed.");
+			try {
+				JSONObject json = new JSONObject(itemData.getValue());
+				int bookingId = Integer.parseInt(json.optString("s_booking_id", "0"));
+				int resourceId = Integer.parseInt(json.optString("group", "0"));
+				Timestamp ds = new Timestamp(Long.parseLong(json.optString("startTimestamp", "0")));
+				Timestamp de = new Timestamp(Long.parseLong(json.optString("endTimestamp", "0")));
+				bookingService.updateBookingTime(bookingId, resourceId, ds, de,
+						isWritable(), Env.getContextAsInt(Env.getCtx(), "#AD_User_ID"));
+			} catch (BookingValidationException e) {
+				Clients.showNotification(e.getMessage());
+			} catch (AdempiereException e) {
+				Clients.showNotification(e.getMessage());
+			} catch (Exception e) {
+				Clients.showNotification("Update failed: " + e.getMessage());
 			}
 			refreshView();
 
 		} else if (event.getTarget().getId().equals("bookingUpdated")) {
-			JSONObject json = new JSONObject(itemData.getValue());
-			if (!updateBooking(json)) {
-				Clients.showNotification(errorMessage);
+			try {
+				BookingDTO dto = BookingDTO.fromJson(itemData.getValue());
+				BookingValidator.validate(dto);
+				bookingService.saveBooking(dto, isWritable(), Env.getContextAsInt(Env.getCtx(), "#AD_User_ID"));
+			} catch (BookingValidationException e) {
+				Clients.showNotification(e.getMessage());
+			} catch (AdempiereException e) {
+				Clients.showNotification(e.getMessage());
 			}
 			refreshView();
 		} else if (event.getTarget().getId().equals("bookingDeleted")) {
-			JSONObject json = new JSONObject(itemData.getValue());
-
-			if (!deleteBooking(json)) {
-				Clients.showNotification(errorMessage);
+			try {
+				JSONObject json = new JSONObject(itemData.getValue());
+				int bookingId = Integer.parseInt(json.optString("id", "0"));
+				bookingService.deleteBooking(bookingId, isWritable(),
+						Env.getContextAsInt(Env.getCtx(), "#AD_User_ID"));
+			} catch (BookingValidationException e) {
+				Clients.showNotification(e.getMessage());
+			} catch (AdempiereException e) {
+				Clients.showNotification(e.getMessage());
 			}
 			refreshView();
 
@@ -225,166 +236,10 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		}
 	}
 
-	private boolean deleteBooking(JSONObject json) {
-
-		if (!isInteger((String) json.get("id")))
-			return false;
-
-		int id = Integer.valueOf((String) json.get("id"));
-		if (id > 0) {
-			MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id, null);
-			int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
-			if (!isWritable() && booking.getCreatedBy() != adUserId) {
-				errorMessage = "Permission denied: only the creator or admin can delete this booking.";
-				return false;
-			}
-			booking.delete(true);
-			return true;
-		}
-		return false;
-	}
-
-	public static boolean isInteger(String str) {
-		return str.matches("-?\\d+");
-	}
-
-	private boolean updateBooking(JSONObject json) {
-
-		int id = 0;
-		if (json.has("s_booking_id")) {
-			Object val = json.get("s_booking_id");
-			if (val != null && !val.toString().isEmpty()) {
-				try {
-					id = Integer.valueOf(val.toString());
-				} catch (NumberFormatException e) {
-					// Invalid format, use 0
-				}
-			}
-		}
-
-		// Permission check for existing bookings
-		if (id > 0) {
-			MResourceAssignment existing = new MResourceAssignment(Env.getCtx(), id, null);
-			int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
-			if (!isWritable() && existing.getCreatedBy() != adUserId) {
-				errorMessage = "Permission denied: only the creator or admin can update this booking.";
-				return false;
-			}
-		}
-
-		Trx trx = Trx.get(Trx.createTrxName(), true); // Create a new transaction
-		boolean ok = false;
-		try {
-			// Start the transaction
-			trx.start();
-
-			MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), id, trx.getTrxName());
-			String name = json.optString("booking-name", "").trim();
-			String description = json.optString("description", "").trim();
-
-			if (name.isEmpty()) {
-				errorMessage = "Subject (Name) is required.";
-				return false;
-			}
-
-			booking.setDescription(description);
-			booking.setName(name);
-			booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
-			booking.setAssignDateFrom(new Timestamp(Long.valueOf((String) json.get("assign-date-from-timestamp"))));
-			booking.setAssignDateTo(new Timestamp(Long.valueOf((String) json.get("assign-date-to-timestamp"))));
-
-			// Failsafe: Ensure Org is set
-			if (booking.getAD_Org_ID() == 0) {
-				booking.setAD_Org_ID(Env.getAD_Org_ID(Env.getCtx()));
-			}
-
-			// Validate Resource is Active/Correct? (Add logic if needed)
-
-			ok = booking.save(trx.getTrxName());
-			if (!ok) {
-				errorMessage = "時間重疊:" + booking.getAssignDateFrom().toString();
-				errorMessage += " - " + booking.getAssignDateTo().toString();
-				return ok;
-			}
-
-			if (id == 0 && json.has("is-weekly")) {
-				boolean isWeekly = json.get("is-weekly").toString().equals("Y");
-
-				if (!isWeekly)
-					return ok;
-
-				Timestamp repeatTo = new Timestamp(Long.valueOf((String) json.get("repeat-date-to-timestamp")));
-				Calendar calendarFrom = Calendar.getInstance();
-				Calendar calendarTo = Calendar.getInstance();
-				Calendar calendarEnd = Calendar.getInstance();
-
-				calendarFrom.setTime(booking.getAssignDateFrom());
-				calendarFrom.add(Calendar.DAY_OF_MONTH, 7);
-
-				calendarTo.setTime(booking.getAssignDateTo());
-				calendarTo.add(Calendar.DAY_OF_MONTH, 7);
-
-				calendarEnd.setTime(repeatTo);
-
-				while (calendarFrom.before(calendarEnd)) {
-
-					booking = new MResourceAssignment(Env.getCtx(), 0, trx.getTrxName());
-					booking.setDescription(description);
-					booking.setName(name);
-					booking.setS_Resource_ID(Integer.valueOf(json.get("s_resource_id").toString()));
-
-					booking.setAssignDateFrom(new Timestamp(calendarFrom.getTimeInMillis()));
-					booking.setAssignDateTo(new Timestamp(calendarTo.getTimeInMillis()));
-
-					if (booking.getAD_Org_ID() == 0) {
-						booking.setAD_Org_ID(Env.getAD_Org_ID(Env.getCtx()));
-					}
-
-					if (!booking.save(trx.getTrxName())) {
-						errorMessage = "時間重疊:" + booking.getAssignDateFrom().toString();
-						errorMessage += " - " + booking.getAssignDateTo().toString();
-						throw new AdempiereException();
-					}
-
-					calendarFrom.add(Calendar.DAY_OF_MONTH, 7);
-					calendarTo.add(Calendar.DAY_OF_MONTH, 7);
-				}
-
-			}
-
-			trx.commit();
-		} catch (Exception e) {
-			ok = false;
-			errorMessage = "Error saving booking: " + e.getMessage();
-			trx.rollback();
-		} finally {
-			// Close the transaction
-			trx.close();
-			return ok;
-		}
-	}
-
-	private boolean updateBooking(int s_Booking_ID, int groupID, Timestamp ds, Timestamp de) {
-		if (s_Booking_ID <= 0)
-			return false; // Cannot update a non-existent booking, prevents NULL Name error on insert
-
-		MResourceAssignment booking = new MResourceAssignment(Env.getCtx(), s_Booking_ID, null);
-
-		int adUserId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
-		if (!isWritable() && booking.getCreatedBy() != adUserId) {
-			return false;
-		}
-
-		booking.setAssignDateFrom(ds);
-		booking.setAssignDateTo(de);
-		booking.setS_Resource_ID(groupID);
-		return booking.save();
-
-	}
-
 	@Override
 	protected void initForm() {
 		currentViewDate = new Timestamp(System.currentTimeMillis());
+		bookingService = new BookingService(Env.getCtx());
 
 		String zulPath = "~./meetingroom.zul";
 		Properties p = Env.getCtx();
@@ -545,13 +400,10 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	// Helper for custom views query
 	private List<MResourceAssignment> fetchBookings(Timestamp start, Timestamp end) {
-		String whereSql = " AssignDateFrom >= ? AND AssignDateFrom <= ? "
-				+ "and exists (select 1 from S_Resource where S_Resource_ID = S_ResourceAssignment.S_Resource_ID and S_ResourceType_ID = ?) ";
-
-		return new Query(Env.getCtx(), MResourceAssignment.Table_Name, whereSql, null)
-				.setParameters(
-						new Object[] { start, end, Integer.valueOf((String) resourceType.getSelectedItem().getId()) })
-				.setOrderBy("S_Resource_ID").setOnlyActiveRecords(true).list();
+		Listitem item = resourceType.getSelectedItem();
+		if (item == null) return new ArrayList<>();
+		int resourceTypeId = Integer.parseInt((String) item.getId());
+		return bookingService.fetchBookings(resourceTypeId, start, end);
 	}
 
 	private void renewGroup() {
@@ -564,33 +416,11 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	}
 
 	private String getResourceJSON() {
-		ArrayList<Group> list = new ArrayList<Group>();
-
-		String sql = "select * from s_resource where s_resourcetype_id = ?  ";
 		Listitem item = resourceType.getSelectedItem();
-		if (item == null)
-			return new Gson().toJson(list);
-		PreparedStatement pstmt = null;
-		ResultSet rs = null;
-		try {
-			pstmt = DB.prepareStatement(sql, null);
-			pstmt.setInt(1, Integer.valueOf((String) item.getId()));
-			rs = pstmt.executeQuery();
-			while (rs.next()) {
-				int id = rs.getInt("s_resource_id");
-				String name = rs.getString("name");
-				list.add(new Group(id, name));
-			}
-		} catch (SQLException ex) {
-			throw new AdempiereException("Unable to load resource", ex);
-		} finally {
-			DB.close(rs, pstmt);
-			rs = null;
-			pstmt = null;
-		}
-		groups = list;
-
-		return new Gson().toJson(list);
+		if (item == null) return new Gson().toJson(new ArrayList<Group>());
+		int resourceTypeId = Integer.parseInt((String) item.getId());
+		groups = (ArrayList<Group>) bookingService.fetchGroups(resourceTypeId);
+		return new Gson().toJson(groups);
 	}
 
 	private boolean isWritable() {
@@ -835,12 +665,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 							b.getS_ResourceAssignment_ID());
 				}
 
-				String nameJS = b.getName().replace("\\", "\\\\").replace("'", "\\'").replace("\"", "\\\"");
-				String descJS = "";
-				if (b.getDescription() != null) {
-					descJS = b.getDescription().replace("\r", "").replace("\n", " ").replace("\\", "\\\\")
-							.replace("'", "\\'").replace("\"", "\\\"");
-				}
+				String nameJS = BookingValidator.escapeForJs(b.getName());
+				String descJS = BookingValidator.escapeForJs(b.getDescription());
 
 				String editableClass = isOwnerOrAdmin ? "editable" : "";
 				String resizeHandleHtml = isOwnerOrAdmin ? "<div class='resize-handle'></div>" : "";
