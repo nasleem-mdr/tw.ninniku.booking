@@ -408,14 +408,6 @@ BookingApp.WeekView = (function () {
         });
     }
 
-    function doScroll() {
-        var el = document.querySelector('.scroll-body');
-        if (el && el.scrollHeight > 500) {
-            el.scrollTop = 320;
-            console.log('Scrolled to 320px (8:00 AM), current:', el.scrollTop);
-        }
-    }
-
     // ---------------------------------------------------------------------------
     // Public API
     // ---------------------------------------------------------------------------
@@ -653,9 +645,6 @@ BookingApp.WeekView = (function () {
         if (window._timeIndicatorInterval) clearInterval(window._timeIndicatorInterval);
         window._timeIndicatorInterval = setInterval(updateTimeIndicator, 60000);
     });
-
-    // Also run immediately in case of ZUL update
-    updateTimeIndicator();
 
     return {
         openCustomAddDialog:      openCustomAddDialog,
