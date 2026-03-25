@@ -238,10 +238,9 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			html.setVflex("1");
 			bookingContainer.appendChild(html);
 
-			renewItem(100);
+			renewItem();
 			// Re-initialize chart because the DOM element was recreated
-			String cmd = "setTimeout(function(){ BookingApp.Timeline.initChart(); }, 200);";
-			Clients.evalJavaScript(cmd);
+			Clients.evalJavaScript(whenReady("BookingApp.Timeline.initChart();"));
 		} else if (VIEW_WEEK.equals(currentViewMode)) {
 			renderWeekView();
 		} else if (VIEW_DAY.equals(currentViewMode)) {
@@ -322,9 +321,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		// Default load
 		if (VIEW_TIMELINE.equals(currentViewMode)) {
-			renewItem(500);
-			String cmd = "setTimeout(function(){ BookingApp.Timeline.initChart(); }, 2000)";
-			Clients.evalJavaScript(cmd);
+			renewItem();
+			Clients.evalJavaScript(whenReady("BookingApp.Timeline.initChart();"));
 		} else {
 			refreshView();
 		}
@@ -350,7 +348,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	}
 
-	private void renewItem(int delay) {
+	private void renewItem() {
 		String itemJson = getBookingJSON();
 
 		// If custom views, we don't send to vis.js but we might reuse getBookingJSON
@@ -359,10 +357,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		// We should probably respect currentViewDate if possible, or leave Timeline as
 		// is.
 
-		String cmd = "BookingApp.Timeline.setItems(" + itemJson + ");";
-		cmd = " setTimeout(function(){" + cmd + "}," + delay + ");";
-		// cmd = " jq(document).ready(function () {" +cmd+ " });";
-		Clients.evalJavaScript(cmd);
+		Clients.evalJavaScript(whenReady("BookingApp.Timeline.setItems(" + itemJson + ");"));
 
 	}
 
@@ -423,8 +418,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		String groupJson = getResourceJSON();
 
-		String cmd = "BookingApp.Timeline.setGroups(" + groupJson + ");";
-		Clients.evalJavaScript(cmd);
+		Clients.evalJavaScript(whenReady("BookingApp.Timeline.setGroups(" + groupJson + ");"));
 
 	}
 
@@ -434,6 +428,20 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		int resourceTypeId = Integer.parseInt((String) item.getId());
 		groups = bookingService.fetchGroups(resourceTypeId);
 		return new Gson().toJson(groups);
+	}
+
+	/**
+	 * Wraps a JS expression in a polling IIFE that retries every 50 ms until
+	 * BookingApp.Timeline is defined. Required because ZK injects &lt;script&gt; tags
+	 * dynamically (async) when the form opens via AJAX, so BookingApp may not yet
+	 * exist when evalJavaScript fires.
+	 */
+	private static String whenReady(String jsExpression) {
+		return "(function poll(){"
+			+ "if(window.BookingApp&&window.BookingApp.Timeline){"
+			+ jsExpression
+			+ "}else{setTimeout(poll,50);"
+			+ "}})();";
 	}
 
 	private boolean isWritable() {
