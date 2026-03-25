@@ -49,6 +49,9 @@ public class MResourceAssignment extends org.compiere.model.MResourceAssignment 
 		Object[] paras = new Object[] { getS_Resource_ID(), getAssignDateFrom(), getAssignDateTo(),
 				getS_ResourceAssignment_ID() };
 
+		// KNOWN LIMITATION: This check-then-act pattern is not atomic at the database level.
+		// Two concurrent saves can both pass isOverlap() and both insert, causing a double-booking.
+		// Fixing this requires a DB-level unique constraint or advisory lock (out of scope).
 		return DB.getSQLValue(get_TrxName(), sql, paras) > 0;
 	}
 }
