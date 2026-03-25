@@ -108,13 +108,12 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 			long endMs = startMs + 3600000; // +1 hour
 
 			String cmd = "var msg = 'Debug: '; " + "msg += 'isload=' + (typeof isload) + ', '; "
-					+ "msg += 'initChart=' + (typeof initChart) + ', '; "
-					+ "msg += 'openOld=' + (typeof window.openCustomAddDialog) + ', '; "
-					+ "msg += 'openRange=' + (typeof window.openCustomAddDialogRange); "
+					+ "msg += 'BookingApp.Timeline=' + (typeof BookingApp !== 'undefined' ? typeof BookingApp.Timeline : 'n/a') + ', '; "
+					+ "msg += 'BookingApp.WeekView=' + (typeof BookingApp !== 'undefined' ? typeof BookingApp.WeekView : 'n/a'); "
 					+ "console.log(msg); "
-					+ "if(window.openCustomAddDialogRange){ window.openCustomAddDialogRange("
+					+ "if(BookingApp && BookingApp.WeekView && BookingApp.WeekView.openCustomAddDialogRange){ BookingApp.WeekView.openCustomAddDialogRange("
 					+ startMs + "," + endMs
-					+ ", 0); } else { console.error('openCustomAddDialogRange missing'); alert(msg); }";
+					+ ", 0); } else { console.error('BookingApp.WeekView.openCustomAddDialogRange missing'); alert(msg); }";
 			Clients.evalJavaScript(cmd);
 		} else if (event.getTarget() == btnViewTimeline) {
 			updateViewMode(VIEW_TIMELINE);
@@ -227,7 +226,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 			renewItem(100);
 			// Re-initialize chart because the DOM element was recreated
-			String cmd = "setTimeout(function(){ initChart(); }, 200);";
+			String cmd = "setTimeout(function(){ BookingApp.Timeline.initChart(); }, 200);";
 			Clients.evalJavaScript(cmd);
 		} else if (VIEW_WEEK.equals(currentViewMode)) {
 			renderWeekView();
@@ -310,7 +309,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		// Default load
 		if (VIEW_TIMELINE.equals(currentViewMode)) {
 			renewItem(500);
-			String cmd = "setTimeout(function(){" + "initChart();" + " }, 2000)";
+			String cmd = "setTimeout(function(){ BookingApp.Timeline.initChart(); }, 2000)";
 			Clients.evalJavaScript(cmd);
 		} else {
 			refreshView();
@@ -346,7 +345,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		// We should probably respect currentViewDate if possible, or leave Timeline as
 		// is.
 
-		String cmd = "items = new vis.DataSet(" + itemJson + ");";
+		String cmd = "BookingApp.Timeline.setItems(" + itemJson + ");";
 		cmd = " setTimeout(function(){" + cmd + "}," + delay + ");";
 		// cmd = " jq(document).ready(function () {" +cmd+ " });";
 		Clients.evalJavaScript(cmd);
@@ -410,7 +409,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 		String groupJson = getResourceJSON();
 
-		String cmd = "groups= " + groupJson + ";";
+		String cmd = "BookingApp.Timeline.setGroups(" + groupJson + ");";
 		Clients.evalJavaScript(cmd);
 
 	}
@@ -661,7 +660,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				String deleteIconHtml = "";
 				if (isOwnerOrAdmin) {
 					deleteIconHtml = String.format(
-							"<span class='delete-icon' onclick='window.onWeekEventDelete(event, %d)'>&times;</span>",
+							"<span class='delete-icon' onclick='BookingApp.WeekView.onWeekEventDelete(event, %d)'>&times;</span>",
 							b.getS_ResourceAssignment_ID());
 				}
 
@@ -674,7 +673,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				html.append(String.format(
 						"<div class='event-card %s' style='top:%.1fpx; height:%.1fpx; background-color:%s; width:%.1f%%; left:%.1f%%;' "
 								+ "data-id='%d' data-resource-id='%d' data-start-ms='%d' data-end-ms='%d' "
-								+ "onclick=\"onWeekEventClick(event, '%s', '%s', '%s', '%s', %s, %s);\">"
+								+ "onclick=\"BookingApp.WeekView.onWeekEventClick(event, '%s', '%s', '%s', '%s', %s, %s);\">"
 								+ "%s%s%s</div>",
 						editableClass, top, height, color, width, left,
 						b.getS_ResourceAssignment_ID(), b.getS_Resource_ID(), startMs, endMs,
