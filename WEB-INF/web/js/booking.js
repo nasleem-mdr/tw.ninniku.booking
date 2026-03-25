@@ -1,6 +1,9 @@
 /**
- *  Ninniku IT Hub 
+ *  Ninniku IT Hub
  */
+
+var BookingApp = BookingApp || {};
+BookingApp.Timeline = (function () {
 
 var isload = false;
 console.log('booking.js loaded - v3 Check');
@@ -339,96 +342,10 @@ window.clickNew = clickNew;
 
 
 
-/**
- * Week View Drag and Drop Event Initialization
- */
-/* Week View Logic - Merged from booking_weekview.js for reliability */
-console.log('DEBUG: Start of Merged Week View Logic');
-
-window.openCustomAddDialog = function (dateStr, minutesOffset, resourceId) {
-	console.log('DEBUG: openCustomAddDialog called', dateStr, minutesOffset, resourceId);
-	if (!resourceId) {
-		resourceId = (window.groups && window.groups.length > 0) ? window.groups[0].id : 0;
-	}
-	var date = new Date(dateStr);
-	date.setMinutes(date.getMinutes() + minutesOffset);
-	var endDate = new Date(date);
-	endDate.setHours(endDate.getHours() + 1);
-	var item = { start: date, end: endDate, group: resourceId, content: '' };
-
-	if (typeof window.clickNew === 'function') {
-		window.clickNew(item, function () { });
-	} else {
-		console.error("clickNew not defined");
-	}
-};
-
-window.openCustomEditDialog = function (id, name, desc, resourceId, startMs, endMs) {
-	var item = {
-		id: id, s_booking_id: id, name: name, content: name, description: desc,
-		group: resourceId, start: new Date(startMs), end: new Date(endMs)
-	};
-	if (typeof window.openEditDialog === 'function') window.openEditDialog(item, function () { });
-};
-
-window.openCustomAddDialogRange = function (startMs, endMs, resourceId) {
-	if (!resourceId) {
-		resourceId = (window.groups && window.groups.length > 0) ? window.groups[0].id : 0;
-	}
-	var start = new Date(startMs);
-	var end = new Date(endMs);
-	var item = { start: start, end: end, group: resourceId, content: '' };
-	if (typeof window.clickNew === 'function') window.clickNew(item, function () { });
-	else console.error("clickNew not defined");
-};
-
-var _weekViewWasDragging = false;
-window.onWeekDayClick = function (event, elem, dayKey, resourceId) {
-	if (_weekViewWasDragging) { _weekViewWasDragging = false; return; }
-	var rect = elem.getBoundingClientRect();
-	var min = (event.clientY - rect.top) / 40 * 60;
-	if (window.openCustomAddDialog) window.openCustomAddDialog(dayKey, min, resourceId);
-};
-
-window.onWeekEventClick = function (event, id, name, desc, resId, startMs, endMs) {
-	event.stopPropagation();
-	if (window.openCustomEditDialog) window.openCustomEditDialog(id, name, desc, resId, startMs, endMs);
-};
-
-window.weekViewScrollTo8Am = function () {
-	setTimeout(function () {
-		var el = document.querySelector('.scroll-body');
-		if (el) el.scrollTop = 320;
-	}, 200);
-};
-
-window.onWeekEventDelete = function (event, id) {
-	event.stopPropagation();
-	if (confirm('Are you sure you want to delete this booking?')) {
-		// Find ZK widgets for hidden fields
-		var itemDataWidget = zk.Widget.$('$itemData');
-		var boookingDeletedWidget = zk.Widget.$('$bookingDeleted');
-
-		var json = JSON.stringify({ id: String(id) });
-
-		if (itemDataWidget && boookingDeletedWidget) {
-			itemDataWidget.setValue(json);
-			itemDataWidget.fireOnChange();
-
-			boookingDeletedWidget.setValue('DELETE-' + id);
-			boookingDeletedWidget.fireOnChange();
-		} else {
-			// JQuery Fallback
-			var $ = window.$ || window.jQuery || window.jq;
-			$('#itemData').val(json).trigger('change');
-			$('#bookingDeleted').val('DELETE-' + id).trigger('change');
-		}
-	}
-};
-
 /* Drag and Drop Logic */
 (function () {
 	var $ = window.$ || window.jQuery || window.jq;
+	var _weekViewWasDragging = false;
 
 	function getTimeFromY(y, dayKey) {
 		var mins = (y / 40) * 60;
@@ -573,8 +490,8 @@ window.onWeekEventDelete = function (event, id) {
 					end = new Date(start.getTime() + 30 * 60000);
 				}
 
-				if (window.openCustomAddDialogRange) {
-					window.openCustomAddDialogRange(start.getTime(), end.getTime(), dragStartData.resId);
+				if (BookingApp.WeekView && BookingApp.WeekView.openCustomAddDialogRange) {
+					BookingApp.WeekView.openCustomAddDialogRange(start.getTime(), end.getTime(), dragStartData.resId);
 				}
 				$('.drag-ghost').remove();
 				dragGhost = null;
@@ -592,3 +509,15 @@ window.onWeekEventDelete = function (event, id) {
 	initDragEvents();
 })();
 console.log('DEBUG: End of booking.js - Loaded Successfully');
+
+    return {
+        initChart:      initChart,
+        drawChart:      drawChart,
+        setGroups:      function(g) { groups = g; },
+        setItems:       function(data) { items = new vis.DataSet(data); if (timeline) timeline.setItems(items); },
+        getGroups:      function() { return groups; },
+        clickNew:       clickNew,
+        openEditDialog: openEditDialog
+    };
+
+})();
