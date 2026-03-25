@@ -41,6 +41,8 @@ import org.zkoss.zul.Listitem;
 import org.zkoss.zul.Textbox;
 
 import com.google.gson.Gson;
+import org.osgi.framework.Bundle;
+import org.osgi.framework.FrameworkUtil;
 
 import tw.ninniku.booking.model.MResourceAssignment;
 import tw.ninniku.timeline.Group;
@@ -50,7 +52,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private static final long serialVersionUID = 1L;
 	private List<Group> groups;
-	String version = "3.32";
+	String version = resolvePluginVersion();
 	Textbox dateStart;
 	Textbox dateEnd;
 	Textbox dateLast;
@@ -77,6 +79,18 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	private Timestamp currentViewDate; // Represents the start of the view or 'focus' date
 
 	private BookingService bookingService;
+
+	private static String resolvePluginVersion() {
+		Bundle hostBundle = FrameworkUtil.getBundle(BookingTimeline.class);
+		if (hostBundle != null && hostBundle.getBundleContext() != null) {
+			for (Bundle b : hostBundle.getBundleContext().getBundles()) {
+				if ("tw.ninniku.booking".equals(b.getSymbolicName())) {
+					return b.getVersion().toString();
+				}
+			}
+		}
+		return "?.?.?";
+	}
 
 	@Override
 	public void valueChange(ValueChangeEvent evt) {
