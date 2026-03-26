@@ -23,15 +23,15 @@
             <separator bar="true"/>
              <checkbox id="chkWorkHours" label="Only Work Hours" checked="true" />
           </toolbar>
-  <script src="~./js/vis-timeline-graph2d.min.js"/>
-  <script src="~./js/jquery-ui.js"/>
-  <script src="~./js/jquery.toast.js"/>
-  <script src="~./js/booking.js"/>
-  <script src="~./js/booking_weekview.js"/>
-  <style src="~./styles/vis-timeline-graph2d.min.css"/>
-  <style src="~./styles/jquery-ui.css"/>
-  <style src="~./styles/jquery.toast.css"/>
-  <style src="~./styles/booking.css"/>
+  <script src="/js/vis-timeline-graph2d.min.js"/>
+  <script src="/js/jquery-ui.js"/>
+  <script src="/js/jquery.toast.js"/>
+  <script src="/js/booking.js"/>
+  <script src="/js/booking_weekview.js"/>
+  <style src="/styles/vis-timeline-graph2d.min.css"/>
+  <style src="/styles/jquery-ui.css"/>
+  <style src="/styles/jquery.toast.css"/>
+  <style src="/styles/booking.css"/>
     <style>
 /* Week View Styles Inlined for Reliability */
 .week-view-root { font-family: 'Roboto', sans-serif; height: 100%; display: flex; flex-direction: column; overflow: hidden; }

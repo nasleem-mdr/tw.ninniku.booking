@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Booking
 Bundle-SymbolicName: tw.ninniku.booking;singleton:=true
-Bundle-Version: 10.0.1.qualifier
+Bundle-Version: 3.1.33.qualifier
 Bundle-Activator: tw.ninniku.booking.Activator
 Require-Bundle: org.adempiere.ui.zk,
  org.adempiere.base,
