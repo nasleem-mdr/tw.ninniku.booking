@@ -125,7 +125,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 					+ "msg += 'BookingApp.Timeline=' + (typeof BookingApp !== 'undefined' ? typeof BookingApp.Timeline : 'n/a') + ', '; "
 					+ "msg += 'BookingApp.WeekView=' + (typeof BookingApp !== 'undefined' ? typeof BookingApp.WeekView : 'n/a'); "
 					+ "console.log(msg); "
-					+ "if(BookingApp && BookingApp.WeekView && BookingApp.WeekView.openCustomAddDialogRange){ BookingApp.WeekView.openCustomAddDialogRange("
+					+ "if(window.BookingApp && window.BookingApp.WeekView && window.BookingApp.WeekView.openCustomAddDialogRange){ window.BookingApp.WeekView.openCustomAddDialogRange("
 					+ startMs + "," + endMs
 					+ ", 0); } else { console.error('BookingApp.WeekView.openCustomAddDialogRange missing'); alert(msg); }";
 			Clients.evalJavaScript(cmd);
@@ -253,7 +253,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		currentViewDate = new Timestamp(System.currentTimeMillis());
 		bookingService = new BookingService(Env.getCtx());
 
-		String zulPath = "~./meetingroom.zul";
+		String zulPath = "~./web/meetingroom.zul";
 		Properties p = Env.getCtx();
 
 		Map<String, String> labels = new HashMap<>();
@@ -409,7 +409,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 	// Helper for custom views query
 	private List<MResourceAssignment> fetchBookings(Timestamp start, Timestamp end) {
 		Listitem item = resourceType.getSelectedItem();
-		if (item == null) return new ArrayList<>();
+		if (item == null)
+			return new ArrayList<>();
 		int resourceTypeId = Integer.parseInt((String) item.getId());
 		return bookingService.fetchBookings(resourceTypeId, start, end);
 	}
@@ -424,7 +425,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	private String getResourceJSON() {
 		Listitem item = resourceType.getSelectedItem();
-		if (item == null) return new Gson().toJson(new ArrayList<Group>());
+		if (item == null)
+			return new Gson().toJson(new ArrayList<Group>());
 		int resourceTypeId = Integer.parseInt((String) item.getId());
 		groups = bookingService.fetchGroups(resourceTypeId);
 		return new Gson().toJson(groups);
@@ -432,16 +434,17 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 
 	/**
 	 * Wraps a JS expression in a polling IIFE that retries every 50 ms until
-	 * BookingApp.Timeline is defined. Required because ZK injects &lt;script&gt; tags
+	 * BookingApp.Timeline is defined. Required because ZK injects &lt;script&gt;
+	 * tags
 	 * dynamically (async) when the form opens via AJAX, so BookingApp may not yet
 	 * exist when evalJavaScript fires.
 	 */
 	private static String whenReady(String jsExpression) {
 		return "(function poll(){"
-			+ "if(window.BookingApp&&window.BookingApp.Timeline){"
-			+ jsExpression
-			+ "}else{setTimeout(poll,50);"
-			+ "}})();";
+				+ "if(window.BookingApp&&window.BookingApp.Timeline){"
+				+ jsExpression
+				+ "}else{setTimeout(poll,50);"
+				+ "}})();";
 	}
 
 	private boolean isWritable() {
@@ -570,7 +573,8 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		// Date title row
 		SimpleDateFormat sdfDate = new SimpleDateFormat("yyyy/MM/dd (EEE)");
 		cal.setTime(start);
-		html.append("<div style='text-align:center; font-size:15px; font-weight:bold; padding:6px 0; background:#f5f5f5; border-bottom:1px solid #ddd; flex-shrink:0;'>")
+		html.append(
+				"<div style='text-align:center; font-size:15px; font-weight:bold; padding:6px 0; background:#f5f5f5; border-bottom:1px solid #ddd; flex-shrink:0;'>")
 				.append(sdfDate.format(cal.getTime()))
 				.append("</div>");
 
@@ -669,12 +673,14 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 				String resName = resourceNameMap.getOrDefault(b.getS_Resource_ID(), "");
 				if (!resName.isEmpty())
 					resName = "[" + BookingValidator.escapeForHtml(resName) + "] ";
-				String title = resName + BookingValidator.escapeForHtml(b.getName()) + " (" + BookingValidator.escapeForHtml(user.getName()) + ")";
+				String title = resName + BookingValidator.escapeForHtml(b.getName()) + " ("
+						+ BookingValidator.escapeForHtml(user.getName()) + ")";
 
 				String color = getResourceColor(b.getS_Resource_ID());
 				String displayContent = title;
 				if (b.getDescription() != null && !b.getDescription().isEmpty()) {
-					displayContent += "<br/><span style='font-size:10px; opacity:0.9;'>" + BookingValidator.escapeForHtml(b.getDescription())
+					displayContent += "<br/><span style='font-size:10px; opacity:0.9;'>"
+							+ BookingValidator.escapeForHtml(b.getDescription())
 							+ "</span>";
 				}
 
