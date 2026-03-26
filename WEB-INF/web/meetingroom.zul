@@ -23,16 +23,15 @@
             <separator bar="true"/>
              <checkbox id="chkWorkHours" label="Only Work Hours" checked="true" />
           </toolbar>
-          <zscript>String uuid = java.util.UUID.randomUUID().toString(); // Generates a UUID</zscript>
-  <script type="text/javascript" src="/js/vis-timeline-graph2d.min.js"></script>
-  <script src="/js/jquery-ui.js"></script> 
-  <script src="/js/jquery.toast.js"></script> 
-    <script src="/js/booking.js?version=${uuid}"></script>
-    <script src="/js/booking_weekview.js?version=${uuid}"></script>
-   <style src="/styles/vis-timeline-graph2d.min.css"/>
-    <style src="/styles/jquery-ui.css"/> 
-    <style src="/styles/jquery.toast.css"/> 
-    <style src="/styles/booking.css?version=${uuid}"/>
+  <script src="~./js/vis-timeline-graph2d.min.js"/>
+  <script src="~./js/jquery-ui.js"/>
+  <script src="~./js/jquery.toast.js"/>
+  <script src="~./js/booking.js"/>
+  <script src="~./js/booking_weekview.js"/>
+  <style src="~./styles/vis-timeline-graph2d.min.css"/>
+  <style src="~./styles/jquery-ui.css"/>
+  <style src="~./styles/jquery.toast.css"/>
+  <style src="~./styles/booking.css"/>
     <style>
 /* Week View Styles Inlined for Reliability */
 .week-view-root { font-family: 'Roboto', sans-serif; height: 100%; display: flex; flex-direction: column; overflow: hidden; }

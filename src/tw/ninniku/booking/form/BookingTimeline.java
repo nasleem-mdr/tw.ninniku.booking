@@ -253,7 +253,7 @@ public class BookingTimeline extends ADForm implements IFormController, EventLis
 		currentViewDate = new Timestamp(System.currentTimeMillis());
 		bookingService = new BookingService(Env.getCtx());
 
-		String zulPath = "~./web/meetingroom.zul";
+		String zulPath = "~./meetingroom.zul";
 		Properties p = Env.getCtx();
 
 		Map<String, String> labels = new HashMap<>();
