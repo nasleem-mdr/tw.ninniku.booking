@@ -88,11 +88,11 @@
 
   <!-- Toolbar -->
   <toolbar>
-    <label value="Booking"/>
+    <label value="@load(vm.labels.booking)"/>
     <separator bar="true"/>
-    <button mold="os" label="Refresh" onClick="@command('refresh')"/>
+    <button mold="os" label="@load(vm.labels.refresh)" onClick="@command('refresh')"/>
     <separator bar="true"/>
-    <label value="Resource:"/>
+    <label value="@load(vm.labels.resource)"/>
     <listbox mold="select" width="150px"
              model="@load(vm.resourceTypes)"
              selectedItem="@bind(vm.selectedResourceType)"
@@ -102,12 +102,12 @@
       </template>
     </listbox>
     <separator bar="true"/>
-    <button mold="os" label="Week"     onClick="@command('changeViewMode', mode='week')"/>
-    <button mold="os" label="Day"      onClick="@command('changeViewMode', mode='day')"/>
-    <button mold="os" label="Timeline" onClick="@command('changeViewMode', mode='timeline')"/>
+    <button mold="os" label="@load(vm.labels.week)"     onClick="@command('changeViewMode', mode='week')"/>
+    <button mold="os" label="@load(vm.labels.day)"      onClick="@command('changeViewMode', mode='day')"/>
+    <button mold="os" label="@load(vm.labels.timeline)" onClick="@command('changeViewMode', mode='timeline')"/>
     <separator bar="true"/>
     <button mold="os" label="&lt;"  onClick="@command('prevPeriod')"/>
-    <button mold="os" label="Today" onClick="@command('today')"/>
+    <button mold="os" label="@load(vm.labels.today)"    onClick="@command('today')"/>
     <button mold="os" label="&gt;"  onClick="@command('nextPeriod')"/>
     <label value="Version ${arg.version}" style="margin-left:auto;color:#888;font-size:11px;padding-right:6px;"/>
   </toolbar>
@@ -126,14 +126,14 @@
     <div sclass="booking-modal-box">
       <!-- Title bar -->
       <div sclass="booking-modal-titlebar">
-        <label value="@load(vm.editMode ? '編輯預約' : '新增預約')" sclass="booking-modal-title-label"/>
+        <label value="@load(vm.editMode ? vm.labels.editBooking : vm.labels.newBooking)" sclass="booking-modal-title-label"/>
         <button label="×" sclass="booking-modal-close-btn" onClick="@command('closeDialog')"/>
       </div>
       <!-- Form grid -->
       <grid style="padding:8px;">
         <rows>
           <row>
-            <label value="Resource"/>
+            <label value="@load(vm.labels.resource)"/>
             <listbox mold="select" width="200px"
                      model="@load(vm.resources)"
                      selectedItem="@bind(vm.draft.selectedGroup)">
@@ -143,33 +143,33 @@
             </listbox>
           </row>
           <row>
-            <label value="Name *"/>
+            <label value="@load(vm.labels.name)"/>
             <textbox value="@bind(vm.draft.name)" width="300px"/>
           </row>
           <row>
-            <label value="Memo"/>
+            <label value="@load(vm.labels.memo)"/>
             <textbox value="@bind(vm.draft.description)" width="300px" rows="3"/>
           </row>
           <row>
-            <label value="Start"/>
+            <label value="@load(vm.labels.start)"/>
             <hlayout>
               <datebox value="@bind(vm.draft.startDate)" format="yyyy-MM-dd" width="130px"/>
               <timebox value="@bind(vm.draft.startTime)" format="HH:mm" width="80px"/>
             </hlayout>
           </row>
           <row>
-            <label value="End"/>
+            <label value="@load(vm.labels.end)"/>
             <hlayout>
               <datebox value="@bind(vm.draft.endDate)" format="yyyy-MM-dd" width="130px"/>
               <timebox value="@bind(vm.draft.endTime)" format="HH:mm" width="80px"/>
             </hlayout>
           </row>
           <row>
-            <label value="Weekly"/>
+            <label value="@load(vm.labels.weekly)"/>
             <checkbox checked="@bind(vm.draft.weekly)"/>
           </row>
           <row visible="@load(vm.draft.weekly)">
-            <label value="Repeat Until"/>
+            <label value="@load(vm.labels.repeatUntil)"/>
             <datebox value="@bind(vm.draft.weeklyEndDate)" format="yyyy-MM-dd" width="130px"/>
           </row>
           <row>
@@ -181,10 +181,10 @@
       </grid>
       <!-- Footer buttons -->
       <div sclass="booking-dialog-footer">
-        <button label="Save"   onClick="@command('saveBooking')"/>
-        <button label="Delete" onClick="@command('deleteBooking')"
+        <button label="@load(vm.labels.save)"   onClick="@command('saveBooking')"/>
+        <button label="@load(vm.labels.delete)" onClick="@command('deleteBooking')"
                 visible="@load(vm.editMode)"/>
-        <button label="Cancel" onClick="@command('closeDialog')"/>
+        <button label="@load(vm.labels.cancel)" onClick="@command('closeDialog')"/>
       </div>
     </div>
   </div>
