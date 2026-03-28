@@ -147,7 +147,7 @@ BookingApp.WeekView = (function () {
         console.log("Updating Booking: " + s_booking_id + " to " + start.toLocaleString() + " - " + end.toLocaleString());
 
         var item = {
-            s_booking_id: String(s_booking_id),
+            id: String(s_booking_id),
             group: String(group),
             startTimestamp: String(start.getTime()),
             endTimestamp: String(end.getTime())
