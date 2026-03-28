@@ -12,6 +12,7 @@ import java.util.Properties;
 import org.adempiere.exceptions.AdempiereException;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
+import org.compiere.util.Msg;
 import org.compiere.util.Trx;
 
 import tw.ninniku.booking.model.MResourceAssignment;
@@ -43,8 +44,7 @@ public class BookingService {
         if (dto.bookingId > 0) {
             MResourceAssignment existing = new MResourceAssignment(ctx, dto.bookingId, null);
             if (!isAdmin && existing.getCreatedBy() != currentUserId) {
-                throw new BookingValidationException(
-                        "Permission denied: only the creator or admin can update this booking.");
+                throw new BookingValidationException(Msg.getMsg(ctx, "BK_PermissionUpdate"));
             }
         }
 
@@ -64,8 +64,7 @@ public class BookingService {
             }
 
             if (!booking.save(trx.getTrxName())) {
-                String msg = "時間重疊:" + booking.getAssignDateFrom() + " - " + booking.getAssignDateTo();
-                throw new AdempiereException(msg);
+                throw new AdempiereException(Msg.getMsg(ctx, "BK_TimeOverlap") + ": " + booking.getAssignDateFrom() + " - " + booking.getAssignDateTo());
             }
             savedId = booking.getS_ResourceAssignment_ID();
 
@@ -91,8 +90,7 @@ public class BookingService {
                         weekly.setAD_Org_ID(Env.getAD_Org_ID(ctx));
                     }
                     if (!weekly.save(trx.getTrxName())) {
-                        String msg = "時間重疊:" + weekly.getAssignDateFrom() + " - " + weekly.getAssignDateTo();
-                        throw new AdempiereException(msg);
+                        throw new AdempiereException(Msg.getMsg(ctx, "BK_TimeOverlap") + ": " + weekly.getAssignDateFrom() + " - " + weekly.getAssignDateTo());
                     }
                     calFrom.add(Calendar.DAY_OF_MONTH, 7);
                     calTo.add(Calendar.DAY_OF_MONTH, 7);
@@ -106,7 +104,7 @@ public class BookingService {
             throw e;
         } catch (Exception e) {
             trx.rollback();
-            throw new AdempiereException("Error saving booking: " + e.getMessage(), e);
+            throw new AdempiereException(Msg.getMsg(ctx, "BK_ErrorSaving") + ": " + e.getMessage(), e);
         } finally {
             trx.close();
         }
@@ -126,14 +124,13 @@ public class BookingService {
 
         MResourceAssignment booking = new MResourceAssignment(ctx, bookingId, null);
         if (!isAdmin && booking.getCreatedBy() != currentUserId) {
-            throw new BookingValidationException(
-                    "Permission denied: only the creator or admin can update this booking.");
+            throw new BookingValidationException(Msg.getMsg(ctx, "BK_PermissionUpdate"));
         }
         booking.setAssignDateFrom(start);
         booking.setAssignDateTo(end);
         booking.setS_Resource_ID(resourceId);
         if (!booking.save()) {
-            throw new AdempiereException("Time overlap, update failed.");
+            throw new AdempiereException(Msg.getMsg(ctx, "BK_TimeOverlapUpdate"));
         }
     }
 
@@ -148,8 +145,7 @@ public class BookingService {
         if (bookingId <= 0) return;
         MResourceAssignment booking = new MResourceAssignment(ctx, bookingId, null);
         if (!isAdmin && booking.getCreatedBy() != currentUserId) {
-            throw new BookingValidationException(
-                    "Permission denied: only the creator or admin can delete this booking.");
+            throw new BookingValidationException(Msg.getMsg(ctx, "BK_PermissionDelete"));
         }
         booking.delete(true);
     }
@@ -189,7 +185,7 @@ public class BookingService {
                 list.add(new Group(rs.getInt("s_resource_id"), rs.getString("name")));
             }
         } catch (SQLException ex) {
-            throw new AdempiereException("Unable to load resources", ex);
+            throw new AdempiereException(Msg.getMsg(ctx, "BK_FailedLoad"), ex);
         } finally {
             DB.close(rs, pstmt);
         }
