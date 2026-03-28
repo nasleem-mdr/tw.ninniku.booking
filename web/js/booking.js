@@ -104,21 +104,25 @@ function initChart() {
 	}
 
 	container = document.getElementById("booking-chart");
-	if (container) {
-		//container = $("#booking-chart");
-		timeline = new vis.Timeline(container, items, groups, options);
-		$("#loading").hide();
-
-		var today = new Date();
-
-		// Add 5 days to today's date
-		var fiveDaysLater = new Date(today);
-		fiveDaysLater.setDate(today.getDate() + 10);
-		//timeline.moveTo(new Date());
-		timeline.setWindow(today, fiveDaysLater);
-
-		//timeline.focus("1000014");
+	if (!container) {
+		// DOM update not yet applied — retry until the container appears
+		setTimeout(initChart, 50);
+		return;
 	}
+
+	// Destroy any existing timeline before creating a new one
+	if (timeline) {
+		try { timeline.destroy(); } catch(ex) { /* ignore */ }
+		timeline = null;
+	}
+
+	timeline = new vis.Timeline(container, items, groups, options);
+	$("#loading").hide();
+
+	var today = new Date();
+	var fiveDaysLater = new Date(today);
+	fiveDaysLater.setDate(today.getDate() + 10);
+	timeline.setWindow(today, fiveDaysLater);
 
 	updateMeetingRoomSelector();
 	showBeforeDate();
@@ -218,7 +222,7 @@ console.log('DEBUG: End of booking.js - Loaded Successfully');
         initChart:      initChart,
         drawChart:      drawChart,
         setGroups:      function(g) { groups = g; },
-        setItems:       function(data) { items = new vis.DataSet(data); if (timeline) timeline.setItems(items); },
+        setItems:       function(data) { items = new vis.DataSet(data); },
         getGroups:      function() { return groups; },
         clickNew:       clickNew,
         openEditDialog: openEditDialog
