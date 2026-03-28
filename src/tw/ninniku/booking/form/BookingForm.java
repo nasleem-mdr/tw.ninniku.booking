@@ -63,7 +63,7 @@ public class BookingForm extends ADForm
             }
 
         } catch (Exception e) {
-            log.severe("Failed to init BookingForm: " + e.getMessage());
+            log.log(java.util.logging.Level.SEVERE, "Failed to init BookingForm", e);
         } finally {
             Thread.currentThread().setContextClassLoader(cl);
         }
