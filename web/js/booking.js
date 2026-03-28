@@ -119,10 +119,15 @@ function initChart() {
 	timeline = new vis.Timeline(container, items, groups, options);
 	$("#loading").hide();
 
-	var today = new Date();
-	var fiveDaysLater = new Date(today);
-	fiveDaysLater.setDate(today.getDate() + 10);
-	timeline.setWindow(today, fiveDaysLater);
+	// Defer setWindow so vis.js has time to lay out its DOM after creation
+	var _tl = timeline;
+	setTimeout(function () {
+		if (_tl !== timeline) return; // guard against stale reference
+		var now = new Date();
+		var end = new Date(now);
+		end.setDate(now.getDate() + 10);
+		_tl.setWindow(now, end, { animation: false });
+	}, 0);
 
 	updateMeetingRoomSelector();
 	showBeforeDate();
@@ -143,13 +148,10 @@ function drawChart() {
 		timeline.setData({ groups: groups, items: items });
 		timeline.redraw();
 
-		var today = new Date();
-
-		// Add 5 days to today's date
-		var fiveDaysLater = new Date(today);
-		fiveDaysLater.setDate(today.getDate() + 10);
-		//timeline.moveTo(new Date());
-		timeline.setWindow(today, fiveDaysLater);
+		var now = new Date();
+		var end = new Date(now);
+		end.setDate(now.getDate() + 10);
+		timeline.setWindow(now, end, { animation: false });
 	}
 }
 function convertFormToJSON(form) {
