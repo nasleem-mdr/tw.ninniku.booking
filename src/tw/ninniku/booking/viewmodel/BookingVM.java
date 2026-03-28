@@ -118,7 +118,7 @@ public class BookingVM {
         }
 
         private static Timestamp combineDateAndTime(java.util.Date date, java.util.Date time) {
-            if (date == null) return new Timestamp(System.currentTimeMillis());
+            if (date == null) return null;
             Calendar cal = Calendar.getInstance();
             cal.setTime(date);
             if (time != null) {
@@ -707,6 +707,9 @@ public class BookingVM {
     private static BookingDTO draftToDto(BookingDraft d) throws BookingValidationException {
         Timestamp assignFrom = d.getAssignFrom();
         Timestamp assignTo   = d.getAssignTo();
+        if (assignFrom == null || assignTo == null) {
+            throw new BookingValidationException("Start and end date/time are required.");
+        }
         Timestamp weeklyEnd  = d.getWeeklyEndTimestamp();
         String raw = "{"
             + "\"s_booking_id\":\"" + d.getBookingId() + "\","

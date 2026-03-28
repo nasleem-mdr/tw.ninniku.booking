@@ -34,7 +34,13 @@ public class BookingValidator {
         }
         java.sql.Timestamp from = draft.getAssignFrom();
         java.sql.Timestamp to   = draft.getAssignTo();
-        if (from != null && to != null && !from.before(to)) {
+        if (from == null) {
+            throw new BookingValidationException("Start date/time is required.");
+        }
+        if (to == null) {
+            throw new BookingValidationException("End date/time is required.");
+        }
+        if (!from.before(to)) {
             throw new BookingValidationException("Start time must be before end time.");
         }
         if (draft.isWeekly() && draft.getWeeklyEndDate() == null) {
