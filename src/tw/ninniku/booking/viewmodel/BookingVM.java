@@ -64,6 +64,7 @@ public class BookingVM {
     private boolean editMode;
     private String dialogError;
     private BookingDraft draft = new BookingDraft();
+    private int selectedResourceIndex = 0;
 
     // ── i18n labels (loaded once from AD_Message at construction time) ────────
     private final Map<String, String> labels = new LinkedHashMap<>();
@@ -247,7 +248,7 @@ public class BookingVM {
     // ═══════════════════════════════════════════════════════════════════════
 
     @Command
-    @NotifyChange({"dialogVisible", "editMode", "draft", "dialogError"})
+    @NotifyChange({"dialogVisible", "editMode", "draft", "dialogError", "selectedResourceIndex"})
     public void openAddDialog() {
         draft = new BookingDraft();
         Calendar cal = Calendar.getInstance();
@@ -269,6 +270,7 @@ public class BookingVM {
             draft.setSResourceId(getFirstResourceIdForType(selectedResourceType.getS_ResourceType_ID()));
         }
         draft.setSelectedGroup(findGroupById(draft.getSResourceId()));
+        selectedResourceIndex = findResourceIndex(draft.getSResourceId());
         editMode = false;
         dialogError = null;
         dialogVisible = true;
@@ -278,6 +280,9 @@ public class BookingVM {
     @NotifyChange({"dialogVisible", "dialogError", "bookingHtml", "errorMessage"})
     public void saveBooking() {
         try {
+            if (selectedResourceIndex >= 0 && selectedResourceIndex < groups.size()) {
+                draft.setSelectedGroup(groups.get(selectedResourceIndex));
+            }
             BookingValidator.validateDraft(draft);
             BookingDTO dto = draftToDto(draft);
             bookingService.saveBooking(dto, isAdmin, currentUserId);
@@ -343,13 +348,15 @@ public class BookingVM {
         draft.setEndDate(end);
         draft.setEndTime(end);
         draft.setWeekly(false);
+        selectedResourceIndex = findResourceIndex(resId);
         editMode = true;
         dialogError = null;
         dialogVisible = true;
-        BindUtils.postNotifyChange(null, null, this, "draft");
         BindUtils.postNotifyChange(null, null, this, "editMode");
         BindUtils.postNotifyChange(null, null, this, "dialogError");
         BindUtils.postNotifyChange(null, null, this, "dialogVisible");
+        BindUtils.postNotifyChange(null, null, this, "draft");
+        BindUtils.postNotifyChange(null, null, this, "selectedResourceIndex");
     }
 
     /** Called when JS sends onBookingAdd ZK event (click on empty time slot). */
@@ -373,13 +380,15 @@ public class BookingVM {
         draft.setStartTime(start);
         draft.setEndDate(end);
         draft.setEndTime(end);
+        selectedResourceIndex = findResourceIndex(resId);
         editMode = false;
         dialogError = null;
         dialogVisible = true;
-        BindUtils.postNotifyChange(null, null, this, "draft");
         BindUtils.postNotifyChange(null, null, this, "editMode");
         BindUtils.postNotifyChange(null, null, this, "dialogError");
         BindUtils.postNotifyChange(null, null, this, "dialogVisible");
+        BindUtils.postNotifyChange(null, null, this, "draft");
+        BindUtils.postNotifyChange(null, null, this, "selectedResourceIndex");
     }
 
     /** Called when JS sends onBookingDelete ZK event (delete icon click). */
@@ -460,6 +469,15 @@ public class BookingVM {
         if (!groups.isEmpty()) return Integer.parseInt(String.valueOf(groups.get(0).getId()));
         List<Group> g = bookingService.fetchGroups(resourceTypeId);
         if (!g.isEmpty()) return Integer.parseInt(String.valueOf(g.get(0).getId()));
+        return 0;
+    }
+
+    private int findResourceIndex(int sResourceId) {
+        for (int i = 0; i < groups.size(); i++) {
+            try {
+                if (Integer.parseInt(String.valueOf(groups.get(i).getId())) == sResourceId) return i;
+            } catch (NumberFormatException ignore) {}
+        }
         return 0;
     }
 
@@ -666,16 +684,17 @@ public class BookingVM {
                         "<span class='delete-icon' onclick='BookingApp.WeekView.onWeekEventDelete(event,%d)'>&times;</span>",
                         b.getS_ResourceAssignment_ID()) : "";
                 String editableClass = isOwnerOrAdmin ? "editable" : "";
+                String ownClass = (b.getCreatedBy() == currentUserId) ? "own-booking" : "";
                 String resizeHandle = isOwnerOrAdmin ? "<div class='resize-handle'></div>" : "";
                 String nameAttr = BookingValidator.escapeForHtml(b.getName() != null ? b.getName() : "");
                 String descAttr = BookingValidator.escapeForHtml(b.getDescription() != null ? b.getDescription() : "");
                 html.append(String.format(
-                        "<div class='event-card %s' style='top:%.1fpx;height:%.1fpx;"
+                        "<div class='event-card %s %s' style='top:%.1fpx;height:%.1fpx;"
                         + "background-color:%s;width:%.1f%%;left:%.1f%%;' "
                         + "data-id='%d' data-resource-id='%d' data-start-ms='%d' data-end-ms='%d' "
                         + "data-booking-name=\"%s\" data-booking-desc=\"%s\">"
                         + "%s%s%s</div>",
-                        editableClass, top, height, color, width, left,
+                        editableClass, ownClass, top, height, color, width, left,
                         b.getS_ResourceAssignment_ID(), b.getS_Resource_ID(), startMs, endMs,
                         nameAttr, descAttr,
                         displayContent, deleteIconHtml, resizeHandle));
@@ -787,5 +806,7 @@ public class BookingVM {
     public boolean isEditMode()                             { return editMode; }
     public String getDialogError()                          { return dialogError; }
     public BookingDraft getDraft()                          { return draft; }
+    public int getSelectedResourceIndex()                   { return selectedResourceIndex; }
+    public void setSelectedResourceIndex(int v)             { this.selectedResourceIndex = v; }
     public Map<String, String> getLabels()                  { return labels; }
 }
