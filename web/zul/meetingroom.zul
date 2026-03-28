@@ -95,7 +95,7 @@
     <button mold="os" label="Refresh" onClick="@command('refresh')"/>
     <separator bar="true"/>
     <label value="Resource:"/>
-    <listbox mold="select"
+    <listbox mold="select" width="150px"
              model="@load(vm.resourceTypes)"
              selectedItem="@bind(vm.selectedResourceType)"
              onChange="@command('refresh')">
@@ -103,9 +103,6 @@
         <listitem label="@load(rt.name)" value="@load(rt)"/>
       </template>
     </listbox>
-    <separator bar="true"/>
-    <button mold="os" label="Add Booking"
-            onClick="@command('openAddDialog')"/>
     <separator bar="true"/>
     <button mold="os" label="Week"     onClick="@command('changeViewMode', mode='week')"/>
     <button mold="os" label="Day"      onClick="@command('changeViewMode', mode='day')"/>
