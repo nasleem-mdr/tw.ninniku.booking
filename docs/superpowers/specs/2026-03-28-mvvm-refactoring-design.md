@@ -83,23 +83,28 @@ output.. = bin/
 
 ### 3.4 ZUL Script/Style Paths
 
-The guide (§9.1) prohibits `<?script src="~./..."?>` processing instructions — they resolve to the main webapp, not the bundle. However, ZUL `<script src="~./..."/>` elements are distinct: ZK processes them as classpath resource paths and serves them directly from the bundle, which is valid.
-
-All `<script>` and `<style>` tags updated from absolute `/js/...` paths to ZK classpath paths:
+**Strategy: CDN-first.** Third-party libraries are loaded from CDN; custom bundle JS uses `<script src="~./js/..."/>` (ZUL element, distinct from the `<?script?>` PI that the guide §9.1 prohibits).
 
 ```xml
-<script src="~./js/vis-timeline-graph2d.min.js"/>
-<script src="~./js/jquery-ui.js"/>
-<script src="~./js/jquery.toast.js"/>
+<!-- Third-party: CDN -->
+<script src="https://cdn.jsdelivr.net/npm/vis-timeline@7/dist/vis-timeline-graph2d.min.js"/>
+<script src="https://cdn.jsdelivr.net/npm/jquery-ui@1.13/dist/jquery-ui.min.js"/>
+<script src="https://cdn.jsdelivr.net/npm/jquery-toast-plugin@1.3.2/dist/jquery.toast.min.js"/>
+
+<!-- Custom: bundle classpath -->
 <script src="~./js/booking.js"/>
 <script src="~./js/booking_weekview.js"/>
-<style src="~./styles/vis-timeline-graph2d.min.css"/>
-<style src="~./styles/jquery-ui.css"/>
-<style src="~./styles/jquery.toast.css"/>
+
+<!-- Styles: CDN for third-party -->
+<style src="https://cdn.jsdelivr.net/npm/vis-timeline@7/dist/vis-timeline-graph2d.min.css"/>
+<style src="https://cdn.jsdelivr.net/npm/jquery-ui@1.13/dist/themes/base/jquery-ui.min.css"/>
+<style src="https://cdn.jsdelivr.net/npm/jquery-toast-plugin@1.3.2/dist/jquery.toast.min.css"/>
+
+<!-- Custom styles: bundle classpath -->
 <style src="~./styles/booking.css"/>
 ```
 
-If 404s occur at runtime, third-party libs (vis.js, jquery-ui, jquery.toast) can be replaced with CDN URLs as a fallback.
+The bundled third-party JS/CSS files under `web/js/` and `web/styles/` are kept in the repository for offline fallback but are not loaded by default.
 
 ### 3.5 Controller ZUL Path
 
