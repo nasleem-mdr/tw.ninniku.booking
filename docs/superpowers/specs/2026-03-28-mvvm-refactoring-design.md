@@ -43,11 +43,27 @@ WEB-INF/web/images/*            → web/images/*
 
 ### 3.2 MANIFEST.MF
 
+`Bundle-ClassPath` order follows the guide (`src/` before `.`):
+
 ```
 Bundle-ClassPath: src/, .
 ```
 
 Before: `., src/, WEB-INF/` — the `WEB-INF/` entry is removed; `.` (bundle root) gives ZK access to `web/` via `~./`.
+
+The following packages must be added to `Import-Package` for MVVM support (currently absent):
+
+```
+org.zkoss.bind,
+org.zkoss.bind.annotation,
+org.zkoss.zk.ui.select,
+org.zkoss.zk.ui.select.annotation
+```
+
+- `org.zkoss.bind` — `BindUtils`, `Binder`
+- `org.zkoss.bind.annotation` — `@Command`, `@NotifyChange`, `@Init`, `@BindingParam`, `@DependsOn`
+- `org.zkoss.zk.ui.select` — `Selectors.wireComponents()`
+- `org.zkoss.zk.ui.select.annotation` — `@Wire`
 
 ### 3.3 build.properties
 
@@ -67,7 +83,9 @@ output.. = bin/
 
 ### 3.4 ZUL Script/Style Paths
 
-All `<script>` and `<style>` tags in `meetingroom.zul` updated from absolute `/js/...` and `/styles/...` to ZK classpath paths:
+The guide (§9.1) prohibits `<?script src="~./..."?>` processing instructions — they resolve to the main webapp, not the bundle. However, ZUL `<script src="~./..."/>` elements are distinct: ZK processes them as classpath resource paths and serves them directly from the bundle, which is valid.
+
+All `<script>` and `<style>` tags updated from absolute `/js/...` paths to ZK classpath paths:
 
 ```xml
 <script src="~./js/vis-timeline-graph2d.min.js"/>
@@ -80,6 +98,8 @@ All `<script>` and `<style>` tags in `meetingroom.zul` updated from absolute `/j
 <style src="~./styles/jquery.toast.css"/>
 <style src="~./styles/booking.css"/>
 ```
+
+If 404s occur at runtime, third-party libs (vis.js, jquery-ui, jquery.toast) can be replaced with CDN URLs as a fallback.
 
 ### 3.5 Controller ZUL Path
 
@@ -245,9 +265,9 @@ public void onEvent(Event e) {
             vm.setErrorMessage(ex.getMessage());
             BindUtils.postNotifyChange(null, null, vm, "errorMessage");
         }
-    } else if ("onBookingDelete".equals(name)) {
-        // handled via @command in ZUL delete button
     }
+    // onBookingDelete is not handled here — delete flows through the dialog
+    // Delete button (@command('deleteBooking')) after openEditDialog prepopulates the draft.
 }
 ```
 
@@ -279,9 +299,10 @@ private BookingVM getViewModel() {
 ```xml
 <window id="bookingVMContainer" border="none" width="100%" height="100%"
     style="background-color:green" contentStyle="overflow:auto;"
-    apply="org.zkoss.bind.BindComposer"
     viewModel="@id('vm') @init(arg.vm)">
 ```
+
+**Note:** `apply="org.zkoss.bind.BindComposer"` is intentionally omitted. Per the guide (§10), when `viewModel="@init(...)"` is present ZK auto-applies the BindComposer — specifying both causes a ZK Parser warning.
 
 ### 7.2 Toolbar
 
@@ -317,6 +338,7 @@ All toolbar buttons use `@command`. Resource type listbox uses `@load` + `@bind`
   <button mold="os" label="&gt;"  onClick="@command('nextPeriod')"/>
   <separator bar="true"/>
   <checkbox id="chkWorkHours" label="Only Work Hours" checked="true"/>
+  <!-- chkWorkHours is NOT bound to VM — JS reads it via DOM id; id must be preserved -->
 </toolbar>
 ```
 
