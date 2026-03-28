@@ -36,17 +36,17 @@
 .booking-error-label { color: #D32F2F; font-size: 12px; padding: 4px 8px; }
 .booking-dialog-footer { text-align: right; padding: 8px; }
 .booking-dialog-footer button { margin-left: 6px; }
-/* Dialog grid: make field labels clearly readable */
-.booking-modal-box .z-row-cnt > td:first-child .z-label,
-.booking-modal-box .z-row > td:first-child .z-label {
-    color: #333333;
-    font-weight: 600;
+/* Dialog: make all labels and grid cells clearly readable */
+.booking-modal-box .z-label {
+    color: #222222 !important;
     font-size: 13px;
 }
-.booking-modal-box .z-row-cnt > td,
-.booking-modal-box .z-row > td {
-    padding: 6px 10px;
-    vertical-align: middle;
+.booking-modal-box tr > td:first-child .z-label {
+    font-weight: 600 !important;
+}
+.booking-modal-box tr > td {
+    padding: 5px 10px !important;
+    vertical-align: middle !important;
 }
 /* Modal overlay: fixed so it covers the full viewport regardless of scroll/container.
    display:flex has NO !important so ZK's inline display:none (visible=false) takes precedence. */

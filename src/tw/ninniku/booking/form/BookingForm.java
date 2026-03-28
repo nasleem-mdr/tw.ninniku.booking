@@ -70,6 +70,13 @@ public class BookingForm extends ADForm
                 dateLast.addEventListener(Events.ON_CHANGE, this);
             }
 
+            // Register form as event listener for JS→ZK custom events fired on bookingVMContainer
+            if (bookingVMContainer != null) {
+                bookingVMContainer.addEventListener("onBookingEdit",   this);
+                bookingVMContainer.addEventListener("onBookingAdd",    this);
+                bookingVMContainer.addEventListener("onBookingDelete", this);
+            }
+
             // Inject CSS (order matters)
             injectBundleStyle("web/styles/vis-timeline-graph2d.min.css");
             injectBundleStyle("web/styles/jquery-ui.min.css");
