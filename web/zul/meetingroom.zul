@@ -90,8 +90,6 @@
   <toolbar>
     <label value="Booking"/>
     <separator bar="true"/>
-    <label value="Version ${arg.version}"/>
-    <separator bar="true"/>
     <button mold="os" label="Refresh" onClick="@command('refresh')"/>
     <separator bar="true"/>
     <label value="Resource:"/>
@@ -111,6 +109,7 @@
     <button mold="os" label="&lt;"  onClick="@command('prevPeriod')"/>
     <button mold="os" label="Today" onClick="@command('today')"/>
     <button mold="os" label="&gt;"  onClick="@command('nextPeriod')"/>
+    <label value="Version ${arg.version}" style="margin-left:auto;color:#888;font-size:11px;padding-right:6px;"/>
   </toolbar>
 
   <!-- Error label -->
