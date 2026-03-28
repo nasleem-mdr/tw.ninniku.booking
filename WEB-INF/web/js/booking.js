@@ -5,16 +5,6 @@
 var BookingApp = BookingApp || {};
 BookingApp.Timeline = (function () {
 
-    // ── ZK event bridge ──────────────────────────────────────────────────────
-    function sendZkBookingEvent(eventName, data) {
-        var vmContainer = zk.Widget.$('$bookingVMContainer');
-        if (vmContainer) {
-            zAu.send(new zk.Event(vmContainer, eventName, data));
-        } else {
-            console.warn('bookingVMContainer not found for event:', eventName);
-        }
-    }
-
 var isload = false;
 console.log('booking.js loaded - v3 Check');
 // Global functions for custom views
@@ -84,14 +74,14 @@ options = {
 	},
 
 	onRemove: function (item, callback) {
-        if (confirm('Are you sure you want to delete this booking?')) {
-            var bookingId = item.id || item.s_booking_id || 0;
-            sendZkBookingEvent('onBookingDelete', String(bookingId));
-            callback(item);
-        } else {
-            callback(null);
-        }
-    }
+		//callback(null); // cancel deletion
+		zk.$("$itemData").setValue(JSON.stringify(item));
+		zk.$("$itemData").fireOnChange();
+
+		zk.$("$bookingDeleted").setValue(Date.now().toString());
+		zk.$("$bookingDeleted").fireOnChange();
+		callback(item);
+	}
 };
 console.log('Options defined');
 
@@ -177,37 +167,171 @@ function updateMeetingRoomSelector() {
 }
 
 function openEditDialog(item, callback) {
-    var startMs = item.start instanceof Date ? item.start.getTime() : Number(item.start);
-    var endMs   = item.end   instanceof Date ? item.end.getTime()   : Number(item.end);
-    var json = JSON.stringify({
-        's_booking_id':              String(item.id || item.s_booking_id || 0),
-        's_resource_id':             String(item.group || 0),
-        'booking-name':              item.name || item.content || '',
-        'description':               item.description || '',
-        'startTimestamp':            String(startMs),
-        'endTimestamp':              String(endMs),
-        'assign-date-from-timestamp': String(startMs),
-        'assign-date-to-timestamp':   String(endMs)
-    });
-    sendZkBookingEvent('onBookingEdit', json);
-    if (callback) callback(item); // keep timeline item in place
+	$(".weekly").hide();
+
+	$("#s_resource_id").val(item.group);
+	$("#s_booking_id").val(item.s_booking_id);
+	$("#group").val(item.group);
+	$("#booking-name").val(item.name ? item.name : item.content); // Handle varied naming
+	$("#description").val(item.description);
+
+	let start = new Date(item.start);
+	// Handle timezone offset if not already handled
+	// start.setHours(start.getHours() - (start.getTimezoneOffset() / 60)); 
+	// Note: It seems the original code did manual offset adjustment. Keeping it consistent.
+	// However, if called from external views passed as strings/timestamp, we might need care.
+	// Assuming 'item.start' is Date object or ISO string.
+	if (!(start instanceof Date) || isNaN(start)) start = new Date(item.start);
+
+	start.setHours(start.getHours() - (start.getTimezoneOffset() / 60));
+
+	let end = new Date(item.end);
+	if (!(end instanceof Date) || isNaN(end)) end = new Date(item.end);
+	end.setHours(end.getHours() - (end.getTimezoneOffset() / 60));
+
+	$("#assign-date-from").val(start.toISOString().slice(0, 16));
+	$("#assign-date-to").val(end.toISOString().slice(0, 16));
+
+	$("#update-form").dialog({
+		title: "修改預約單",
+		modal: true,
+		width: "500px",
+		buttons: {
+			"Delete": function () {
+				if (confirm("Are you sure you want to delete this booking?")) {
+					$(this).dialog("close");
+
+					// Ensure item has id for deletion
+					if (!item.id && item.s_booking_id) item.id = item.s_booking_id;
+
+					zk.$("$itemData").setValue(JSON.stringify(item));
+					zk.$("$itemData").fireOnChange();
+
+					zk.$("$bookingDeleted").setValue(Date.now().toString());
+					zk.$("$bookingDeleted").fireOnChange();
+
+					if (callback) callback(null); // Remove from timeline if present
+				}
+			},
+			Ok: function () {
+
+				var bName = $("#booking-name").val();
+				var bDesc = $("#description").val();
+				if (!bName || bName.trim() === "") {
+					alert("Please enter a Subject (Name).");
+					return;
+				}
+				if (!bDesc || bDesc.trim() === "") {
+					alert("Please enter a Memo (Description).");
+					return;
+				}
+
+				$(this).dialog("close");
+				if (item) {
+					item.description = $("#description").val();
+					item.group = $("#group").val();
+				}
+				$("#assign-date-from-timestamp").val(toTimestamp($("#assign-date-from").val()));
+				$("#assign-date-to-timestamp").val(toTimestamp($("#assign-date-to").val()));
+				const json = convertFormToJSON($("#booking-form"));
+				/**
+				將Form 資料轉換成 json 讓後端處理
+				 */
+				if (!json.hasOwnProperty("s_booking_id") || json["s_booking_id"] === "") {
+					var val = $("#s_booking_id").val();
+					if (val === undefined || val === null) {
+						val = "0";
+					}
+					json["s_booking_id"] = val;
+				}
+				zk.$("$itemData").setValue(JSON.stringify(json));
+				zk.$("$itemData").fireOnChange();
+				zk.$("$bookingUpdated").setValue(Date.now().toString());
+				zk.$("$bookingUpdated").fireOnChange();
+
+				if (callback) callback(item);
+
+			}, Cancel: function () {
+				$(this).dialog("close");
+				if (callback) callback(null);
+			}
+		}
+	});
 }
 
 function clickNew(item, callback) {
-    var startMs = item.start instanceof Date ? item.start.getTime() : Number(item.start);
-    var endMs   = item.end   instanceof Date ? item.end.getTime()   : Number(item.end);
-    var json = JSON.stringify({
-        's_booking_id':              '0',
-        's_resource_id':             String(item.group || 0),
-        'booking-name':              '',
-        'description':               '',
-        'startTimestamp':            String(startMs),
-        'endTimestamp':              String(endMs),
-        'assign-date-from-timestamp': String(startMs),
-        'assign-date-to-timestamp':   String(endMs)
-    });
-    sendZkBookingEvent('onBookingAdd', json);
-    if (callback) callback(null); // don't add ghost item to timeline — server will refresh
+
+	updateMeetingRoomSelector();
+	$(".weekly").show();
+	$('#is-weekly').removeAttr('checked');
+	showBeforeDate();
+
+	var item = item;
+	var callback = callback;
+	let start = new Date(item.start);
+	start.setHours(start.getHours() - (start.getTimezoneOffset() / 60));
+	let end = new Date(item.end);
+	end.setHours(end.getHours() - (end.getTimezoneOffset() / 60));
+
+	// Default name empty for new
+	$("#booking-name").val("");
+	$("#description").val("");
+
+	$("#assign-date-from").val(start.toISOString().slice(0, 16));
+	$("#assign-date-to").val(end.toISOString().slice(0, 16));
+	$("#s_resource_id").val(item.group);
+	$("#s_booking_id").val(0);
+	$("#update-form").dialog({
+		title: "新增預約單",
+		modal: true,
+		width: "500px",
+		buttons: {
+			Ok: function () {
+
+				var bName = $("#booking-name").val();
+				var bDesc = $("#description").val();
+				if (!bName || bName.trim() === "") {
+					alert("Please enter a Subject (Name).");
+					return;
+				}
+				if (!bDesc || bDesc.trim() === "") {
+					alert("Please enter a Memo (Description).");
+					return;
+				}
+
+				$(this).dialog("close");
+
+
+				$("#assign-date-from-timestamp").val(toTimestamp($("#assign-date-from").val()));
+				$("#assign-date-to-timestamp").val(toTimestamp($("#assign-date-to").val()));
+				$("#repeat-date-to-timestamp").val(toTimestamp($("#repeat-date-to").val()));
+
+				const json = convertFormToJSON($("#booking-form"));
+				//item.content = $("#booking-name").val();
+
+				/**
+				将Form 資料轉換成 json 讓後端處理
+				 */
+				if (!json.hasOwnProperty("s_booking_id") || json["s_booking_id"] === "") {
+					var val = $("#s_booking_id").val();
+					if (val === undefined || val === null) {
+						val = "0";
+					}
+					json["s_booking_id"] = val;
+				}
+				zk.$("$itemData").setValue(JSON.stringify(json));
+				zk.$("$itemData").fireOnChange();
+				zk.$("$bookingUpdated").setValue(Date.now().toString());
+				zk.$("$bookingUpdated").fireOnChange();
+
+				if (callback) callback(item);
+			}, Cancel: function (i) {
+
+				$(this).dialog("close");
+				if (callback) callback(null);
+			}
+		}
+	});
 }
 
 console.log('DEBUG: End of booking.js - Loaded Successfully');
