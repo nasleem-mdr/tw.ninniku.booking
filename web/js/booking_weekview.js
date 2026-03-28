@@ -436,7 +436,12 @@ BookingApp.WeekView = (function () {
                         newY = Math.max(0, newY);
 
                         var dayKey = targetCol.data('date');
-                        var newResId = targetCol.data('resource-id');
+                        // week view: columns are days, resource-id is a dummy default → keep original
+                        // day view: columns are resources → allow resource change
+                        var viewMode = targetCol.closest('.days-grid').data('view');
+                        var newResId = (viewMode === 'day')
+                            ? targetCol.data('resource-id')
+                            : dragData.resId;
 
                         var start = getTimeFromY(newY, dayKey);
                         snapTo30(start);

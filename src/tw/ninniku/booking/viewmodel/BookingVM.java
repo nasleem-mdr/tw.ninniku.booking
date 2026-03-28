@@ -511,7 +511,7 @@ public class BookingVM {
         }
         html.append("</div>"); // time-col
 
-        html.append("<div class='days-grid'>");
+        html.append("<div class='days-grid' data-view='week'>");
         String defaultResId = (!groups.isEmpty() ? String.valueOf(groups.get(0).getId()) : "");
         for (String dayKey : dayKeys) {
             html.append("<div class='day-col' data-date='").append(dayKey)
@@ -570,7 +570,7 @@ public class BookingVM {
         }
         html.append("</div>"); // time-col
 
-        html.append("<div class='days-grid'>");
+        html.append("<div class='days-grid' data-view='day'>");
         for (Group g : groups) {
             int resourceId = Integer.valueOf(String.valueOf(g.getId()));
             html.append("<div class='day-col' data-date='").append(dayKey)
