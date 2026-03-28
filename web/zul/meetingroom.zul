@@ -105,8 +105,7 @@
     </listbox>
     <separator bar="true"/>
     <button mold="os" label="Add Booking"
-            onClick="@command('openAddDialog')"
-            style="background-color:#1976D2;color:white;font-weight:bold;border-radius:4px;box-shadow:0 2px 5px rgba(0,0,0,0.2);"/>
+            onClick="@command('openAddDialog')"/>
     <separator bar="true"/>
     <button mold="os" label="Week"     onClick="@command('changeViewMode', mode='week')"/>
     <button mold="os" label="Day"      onClick="@command('changeViewMode', mode='day')"/>
@@ -180,8 +179,7 @@
       </grid>
       <!-- Footer buttons -->
       <div sclass="booking-dialog-footer">
-        <button label="Save"   onClick="@command('saveBooking')"
-                style="background-color:#1976D2;color:white;padding:4px 12px;"/>
+        <button label="Save"   onClick="@command('saveBooking')"/>
         <button label="Delete" onClick="@command('deleteBooking')"
                 visible="@load(vm.editMode)"/>
         <button label="Cancel" onClick="@command('closeDialog')"/>
