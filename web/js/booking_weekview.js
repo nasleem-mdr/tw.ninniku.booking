@@ -145,25 +145,13 @@ BookingApp.WeekView = (function () {
 
     function triggerUpdate(s_booking_id, group, start, end) {
         console.log("Updating Booking: " + s_booking_id + " to " + start.toLocaleString() + " - " + end.toLocaleString());
-
-        var item = {
+        var json = JSON.stringify({
             id: String(s_booking_id),
             group: String(group),
             startTimestamp: String(start.getTime()),
             endTimestamp: String(end.getTime())
-        };
-
-        var itemDataWidget = zk.Widget.$('$itemData');
-        var dateLastWidget = zk.Widget.$('$dateLast');
-
-        if (itemDataWidget && dateLastWidget) {
-            itemDataWidget.setValue(JSON.stringify(item));
-            itemDataWidget.fireOnChange();
-            dateLastWidget.setValue(Date.now().toString());
-            dateLastWidget.fireOnChange();
-        } else {
-            console.error("ZK Widgets not found!");
-        }
+        });
+        sendZkBookingEvent('onDragUpdate', json);
     }
 
     function initDragEvents() {
@@ -223,23 +211,14 @@ BookingApp.WeekView = (function () {
                 id: card.data('id'),
                 resId: card.data('resource-id'),
                 duration: card.data('end-ms') - card.data('start-ms'),
-                startMs: card.data('start-ms')
+                startMs: card.data('start-ms'),
+                startClientX: e.clientX,
+                startClientY: e.clientY
             };
 
-            card.addClass('dragging');
-            dragGhost = card.clone().removeClass('dragging').addClass('drag-ghost').css({
-                width: dayCol.width() + 'px',
-                zIndex: 1000
-            });
-            dayCol.append(dragGhost);
-
-            isDragging = true;
-            _wasDragging = true;
-
-            if ($('.drag-tooltip').length === 0) {
-                dragTooltip = $('<div class="drag-tooltip"></div>');
-                $('body').append(dragTooltip);
-            } else { dragTooltip = $('.drag-tooltip'); }
+            // Don't set isDragging or create ghost here — wait for movement threshold
+            isDragging = false;
+            _wasDragging = false;
         });
 
         // 3. Create Start (Clicking empty space)
@@ -320,27 +299,47 @@ BookingApp.WeekView = (function () {
 
                 updateTooltip(start, endSnap, e);
             } else if (dragMode === 'move') {
-                var elemBelow = document.elementFromPoint(e.clientX, e.clientY);
-                var targetCol = $(elemBelow).closest('.day-col');
+                var dx = e.clientX - dragData.startClientX;
+                var dy = e.clientY - dragData.startClientY;
 
-                if (targetCol.length > 0) {
-                    if (!dragGhost.parent().is(targetCol)) {
-                        dragGhost.appendTo(targetCol);
-                        dragGhost.css('width', targetCol.width() + 'px');
+                if (!isDragging && Math.sqrt(dx * dx + dy * dy) > 5) {
+                    isDragging = true;
+                    _wasDragging = true;
+                    dragData.card.addClass('dragging');
+                    dragGhost = dragData.card.clone().removeClass('dragging').addClass('drag-ghost').css({
+                        width: dragData.originalCol.width() + 'px',
+                        zIndex: 1000
+                    });
+                    dragData.originalCol.append(dragGhost);
+                    if ($('.drag-tooltip').length === 0) {
+                        dragTooltip = $('<div class="drag-tooltip"></div>');
+                        $('body').append(dragTooltip);
+                    } else { dragTooltip = $('.drag-tooltip'); }
+                }
+
+                if (isDragging) {
+                    var elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+                    var targetCol = $(elemBelow).closest('.day-col');
+
+                    if (targetCol.length > 0) {
+                        if (!dragGhost.parent().is(targetCol)) {
+                            dragGhost.appendTo(targetCol);
+                            dragGhost.css('width', targetCol.width() + 'px');
+                        }
+                        var colRect = targetCol[0].getBoundingClientRect();
+                        var newY = e.clientY - colRect.top - dragData.offsetY;
+                        newY = Math.max(0, newY);
+
+                        dragGhost.css('top', newY + 'px');
+
+                        var dayKey = targetCol.data('date');
+                        var start = getTimeFromY(newY, dayKey);
+                        snapTo30(start);
+
+                        var end = new Date(start.getTime() + dragData.duration);
+
+                        updateTooltip(start, end, e);
                     }
-                    var colRect = targetCol[0].getBoundingClientRect();
-                    var newY = e.clientY - colRect.top - dragData.offsetY;
-                    newY = Math.max(0, newY);
-
-                    dragGhost.css('top', newY + 'px');
-
-                    var dayKey = targetCol.data('date');
-                    var start = getTimeFromY(newY, dayKey);
-                    snapTo30(start);
-
-                    var end = new Date(start.getTime() + dragData.duration);
-
-                    updateTooltip(start, end, e);
                 }
             }
         });
@@ -387,27 +386,45 @@ BookingApp.WeekView = (function () {
                 triggerUpdate(dragData.id, dragData.resId, start, end);
 
             } else if (dragMode === 'move') {
+                var dx = e.clientX - dragData.startClientX;
+                var dy = e.clientY - dragData.startClientY;
+                var dist = Math.sqrt(dx * dx + dy * dy);
+
                 dragData.card.removeClass('dragging');
                 $('.drag-ghost').remove();
                 dragGhost = null;
 
-                var elemBelow = document.elementFromPoint(e.clientX, e.clientY);
-                var targetCol = $(elemBelow).closest('.day-col');
+                if (!isDragging || dist < 5) {
+                    // Click — open edit dialog using data attributes
+                    var card = dragData.card;
+                    openCustomEditDialog(
+                        card.data('id'),
+                        card.attr('data-booking-name') || '',
+                        card.attr('data-booking-desc') || '',
+                        card.data('resource-id'),
+                        card.data('start-ms'),
+                        card.data('end-ms')
+                    );
+                } else {
+                    // Drag — update booking time
+                    var elemBelow = document.elementFromPoint(e.clientX, e.clientY);
+                    var targetCol = $(elemBelow).closest('.day-col');
 
-                if (targetCol.length > 0) {
-                    var colRect = targetCol[0].getBoundingClientRect();
-                    var newY = e.clientY - colRect.top - dragData.offsetY;
-                    newY = Math.max(0, newY);
+                    if (targetCol.length > 0) {
+                        var colRect = targetCol[0].getBoundingClientRect();
+                        var newY = e.clientY - colRect.top - dragData.offsetY;
+                        newY = Math.max(0, newY);
 
-                    var dayKey = targetCol.data('date');
-                    var newResId = targetCol.data('resource-id');
+                        var dayKey = targetCol.data('date');
+                        var newResId = targetCol.data('resource-id');
 
-                    var start = getTimeFromY(newY, dayKey);
-                    snapTo30(start);
+                        var start = getTimeFromY(newY, dayKey);
+                        snapTo30(start);
 
-                    var end = new Date(start.getTime() + dragData.duration);
+                        var end = new Date(start.getTime() + dragData.duration);
 
-                    triggerUpdate(dragData.id, newResId, start, end);
+                        triggerUpdate(dragData.id, newResId, start, end);
+                    }
                 }
             }
 

@@ -129,12 +129,6 @@
     <html content="@load(vm.bookingHtml)" style="display:block;width:100%;min-height:400px;"/>
   </div>
 
-  <!-- Hidden textboxes for drag-drop/resize (timeline only) -->
-  <div style="display:none;">
-    <textbox id="dateLast" visible="false"/>
-    <textbox id="itemData" visible="false"/>
-  </div>
-
   <!-- Booking dialog: CSS overlay (position:fixed breaks out of any ZK container) -->
   <div visible="@load(vm.dialogVisible)" sclass="booking-modal-overlay">
     <div sclass="booking-modal-box">

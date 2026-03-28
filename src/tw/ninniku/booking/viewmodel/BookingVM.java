@@ -620,20 +620,19 @@ public class BookingVM {
                 String deleteIconHtml = isOwnerOrAdmin ? String.format(
                         "<span class='delete-icon' onclick='BookingApp.WeekView.onWeekEventDelete(event,%d)'>&times;</span>",
                         b.getS_ResourceAssignment_ID()) : "";
-                String nameJS = BookingValidator.escapeForJs(b.getName());
-                String descJS = BookingValidator.escapeForJs(b.getDescription());
                 String editableClass = isOwnerOrAdmin ? "editable" : "";
                 String resizeHandle = isOwnerOrAdmin ? "<div class='resize-handle'></div>" : "";
+                String nameAttr = BookingValidator.escapeForHtml(b.getName() != null ? b.getName() : "");
+                String descAttr = BookingValidator.escapeForHtml(b.getDescription() != null ? b.getDescription() : "");
                 html.append(String.format(
                         "<div class='event-card %s' style='top:%.1fpx;height:%.1fpx;"
                         + "background-color:%s;width:%.1f%%;left:%.1f%%;' "
                         + "data-id='%d' data-resource-id='%d' data-start-ms='%d' data-end-ms='%d' "
-                        + "onclick=\"BookingApp.WeekView.onWeekEventClick(event,'%s','%s','%s','%s',%s,%s);\">"
+                        + "data-booking-name=\"%s\" data-booking-desc=\"%s\">"
                         + "%s%s%s</div>",
                         editableClass, top, height, color, width, left,
                         b.getS_ResourceAssignment_ID(), b.getS_Resource_ID(), startMs, endMs,
-                        b.getS_ResourceAssignment_ID(), nameJS, descJS,
-                        b.getS_Resource_ID(), startMs, endMs,
+                        nameAttr, descAttr,
                         displayContent, deleteIconHtml, resizeHandle));
             }
         }

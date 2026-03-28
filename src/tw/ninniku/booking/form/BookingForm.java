@@ -24,12 +24,9 @@ import org.zkoss.zk.ui.Component;
 import org.zkoss.zk.ui.Executions;
 import org.zkoss.zk.ui.event.Event;
 import org.zkoss.zk.ui.event.EventListener;
-import org.zkoss.zk.ui.event.Events;
 import org.zkoss.zk.ui.select.Selectors;
 import org.zkoss.zk.ui.select.annotation.Wire;
 import org.zkoss.zk.ui.util.Clients;
-import org.zkoss.zul.Textbox;
-
 import com.google.gson.Gson;
 
 import tw.ninniku.booking.viewmodel.BookingVM;
@@ -42,12 +39,6 @@ public class BookingForm extends ADForm
 
     @Wire("#bookingVMContainer")
     private Component bookingVMContainer;
-
-    @Wire("#dateLast")
-    private Textbox dateLast;
-
-    @Wire("#itemData")
-    private Textbox itemData;
 
     private BookingVM bookingVM;
 
@@ -68,15 +59,12 @@ public class BookingForm extends ADForm
 
             Selectors.wireComponents(this, this, false);
 
-            if (dateLast != null) {
-                dateLast.addEventListener(Events.ON_CHANGE, this);
-            }
-
             // Register form as event listener for JS→ZK custom events fired on bookingVMContainer
             if (bookingVMContainer != null) {
                 bookingVMContainer.addEventListener("onBookingEdit",   this);
                 bookingVMContainer.addEventListener("onBookingAdd",    this);
                 bookingVMContainer.addEventListener("onBookingDelete", this);
+                bookingVMContainer.addEventListener("onDragUpdate",    this);
             }
 
             // Inject CSS (order matters)
@@ -103,13 +91,12 @@ public class BookingForm extends ADForm
     public void onEvent(Event e) throws Exception {
         String name = e.getName();
 
-        // Drag-drop / resize from timeline view (JS fires dateLast onChange)
-        if (e.getTarget() == dateLast) {
+        // JS → ZK drag-drop / resize update event
+        if ("onDragUpdate".equals(name)) {
             BookingVM vm = getViewModel();
-            if (vm == null || itemData == null) return;
+            if (vm == null) return;
             try {
-                JSONObject json = new JSONObject(itemData.getValue());
-                // "id" is the vis.js item ID = S_ResourceAssignment_ID
+                JSONObject json = new JSONObject((String) e.getData());
                 int bookingId  = (int) parseLong(json, "id", 0);
                 int resourceId = (int) parseLong(json, "group", 0);
                 long startMs   = parseLong(json, "startTimestamp", 0);

@@ -63,14 +63,16 @@ options = {
 	},
 
 	onMove: function (item, callback) {
-		item.startTimestamp = item.start.getTime().toString();
-		item.endTimestamp = item.end.getTime().toString();
-		zk.$("$itemData").setValue(JSON.stringify(item));
-		zk.$("$itemData").fireOnChange();
-		zk.$("$dateLast").setValue(Date.now().toString());
-		cStart = item.start;
-		zk.$("$dateLast").fireOnChange();
-
+		var json = JSON.stringify({
+			id: String(item.id),
+			group: String(item.group),
+			startTimestamp: String(item.start.getTime()),
+			endTimestamp: String(item.end.getTime())
+		});
+		var vmContainer = zk.Widget.$('$bookingVMContainer');
+		if (vmContainer) {
+			zAu.send(new zk.Event(vmContainer, 'onDragUpdate', json));
+		}
 		callback(item);
 	},
 
