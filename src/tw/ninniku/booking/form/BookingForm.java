@@ -1,7 +1,12 @@
 package tw.ninniku.booking.form;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Scanner;
 import java.util.logging.Logger;
 
 import org.adempiere.exceptions.AdempiereException;
@@ -23,7 +28,10 @@ import org.zkoss.zk.ui.event.EventListener;
 import org.zkoss.zk.ui.event.Events;
 import org.zkoss.zk.ui.select.Selectors;
 import org.zkoss.zk.ui.select.annotation.Wire;
+import org.zkoss.zk.ui.util.Clients;
 import org.zkoss.zul.Textbox;
+
+import com.google.gson.Gson;
 
 import tw.ninniku.booking.viewmodel.BookingVM;
 
@@ -61,6 +69,19 @@ public class BookingForm extends ADForm
             if (dateLast != null) {
                 dateLast.addEventListener(Events.ON_CHANGE, this);
             }
+
+            // Inject CSS (order matters)
+            injectBundleStyle("web/styles/vis-timeline-graph2d.min.css");
+            injectBundleStyle("web/styles/jquery-ui.min.css");
+            injectBundleStyle("web/styles/jquery.toast.css");
+            injectBundleStyle("web/styles/booking.css");
+
+            // Inject JS (libraries before app code)
+            injectBundleScript("web/js/vis-timeline-graph2d.min.js");
+            injectBundleScript("web/js/jquery-ui.js");
+            injectBundleScript("web/js/jquery.toast.js");
+            injectBundleScript("web/js/booking.js");
+            injectBundleScript("web/js/booking_weekview.js");
 
         } catch (Exception e) {
             log.log(java.util.logging.Level.SEVERE, "Failed to init BookingForm", e);
@@ -158,6 +179,43 @@ public class BookingForm extends ADForm
     public ADForm getForm() { return this; }
 
     // ── helpers ─────────────────────────────────────────────────────────────
+
+    /** Reads a JS file from the bundle and executes it on the client. */
+    private void injectBundleScript(String resourcePath) {
+        Bundle bundle = FrameworkUtil.getBundle(BookingForm.class);
+        URL url = bundle.getResource(resourcePath);
+        if (url == null) {
+            log.warning("Bundle resource not found: " + resourcePath);
+            return;
+        }
+        try (InputStream is = url.openStream();
+             Scanner sc = new Scanner(is, StandardCharsets.UTF_8)) {
+            Clients.evalJavaScript(sc.useDelimiter("\\A").next());
+        } catch (IOException e) {
+            log.log(java.util.logging.Level.WARNING, "Failed to inject script: " + resourcePath, e);
+        }
+    }
+
+    /** Reads a CSS file from the bundle and injects it as a &lt;style&gt; element. */
+    private void injectBundleStyle(String resourcePath) {
+        Bundle bundle = FrameworkUtil.getBundle(BookingForm.class);
+        URL url = bundle.getResource(resourcePath);
+        if (url == null) {
+            log.warning("Bundle resource not found: " + resourcePath);
+            return;
+        }
+        try (InputStream is = url.openStream();
+             Scanner sc = new Scanner(is, StandardCharsets.UTF_8)) {
+            String css = sc.useDelimiter("\\A").next();
+            String jsonCss = new Gson().toJson(css);
+            Clients.evalJavaScript(
+                "(function(c){var s=document.createElement('style');" +
+                "s.textContent=c;document.head.appendChild(s);})("+jsonCss+");"
+            );
+        } catch (IOException e) {
+            log.log(java.util.logging.Level.WARNING, "Failed to inject style: " + resourcePath, e);
+        }
+    }
 
     private BookingVM getViewModel() {
         if (bookingVMContainer == null) return null;
