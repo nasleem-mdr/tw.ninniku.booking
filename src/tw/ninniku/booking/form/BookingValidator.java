@@ -1,5 +1,8 @@
 package tw.ninniku.booking.form;
 
+import org.compiere.util.Env;
+import org.compiere.util.Msg;
+
 public class BookingValidator {
 
     /**
@@ -8,17 +11,17 @@ public class BookingValidator {
      */
     public static void validate(BookingDTO dto) throws BookingValidationException {
         if (dto.name == null || dto.name.isBlank()) {
-            throw new BookingValidationException("Subject (Name) is required.");
+            throw new BookingValidationException(Msg.getMsg(Env.getCtx(), "BK_NameRequired"));
         }
         if (!dto.startTime.before(dto.endTime)) {
-            throw new BookingValidationException("Start time must be before end time.");
+            throw new BookingValidationException(Msg.getMsg(Env.getCtx(), "BK_StartBeforeEnd"));
         }
         if (dto.isWeekly) {
             if (dto.weeklyEndDate == null) {
-                throw new BookingValidationException("Weekly repeat end date is required.");
+                throw new BookingValidationException(Msg.getMsg(Env.getCtx(), "BK_WeeklyEndRequired"));
             }
             if (!dto.weeklyEndDate.after(dto.endTime)) {
-                throw new BookingValidationException("Weekly repeat end date must be after the booking end time.");
+                throw new BookingValidationException(Msg.getMsg(Env.getCtx(), "BK_WeeklyEndAfterEnd"));
             }
         }
     }
@@ -30,21 +33,21 @@ public class BookingValidator {
     public static void validateDraft(tw.ninniku.booking.viewmodel.BookingVM.BookingDraft draft)
             throws BookingValidationException {
         if (draft.getName() == null || draft.getName().trim().isEmpty()) {
-            throw new BookingValidationException("Name is required.");
+            throw new BookingValidationException(Msg.getMsg(Env.getCtx(), "BK_NameRequired"));
         }
         java.sql.Timestamp from = draft.getAssignFrom();
         java.sql.Timestamp to   = draft.getAssignTo();
         if (from == null) {
-            throw new BookingValidationException("Start date/time is required.");
+            throw new BookingValidationException(Msg.getMsg(Env.getCtx(), "BK_StartRequired"));
         }
         if (to == null) {
-            throw new BookingValidationException("End date/time is required.");
+            throw new BookingValidationException(Msg.getMsg(Env.getCtx(), "BK_EndRequired"));
         }
         if (!from.before(to)) {
-            throw new BookingValidationException("Start time must be before end time.");
+            throw new BookingValidationException(Msg.getMsg(Env.getCtx(), "BK_StartBeforeEnd"));
         }
         if (draft.isWeekly() && draft.getWeeklyEndDate() == null) {
-            throw new BookingValidationException("Weekly end date is required for weekly bookings.");
+            throw new BookingValidationException(Msg.getMsg(Env.getCtx(), "BK_WeeklyEndRequired"));
         }
     }
 
