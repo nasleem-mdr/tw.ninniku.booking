@@ -24,6 +24,25 @@ public class BookingValidator {
     }
 
     /**
+     * Validates a BookingDraft for business rules.
+     * Throws BookingValidationException with a user-facing message if invalid.
+     */
+    public static void validateDraft(tw.ninniku.booking.viewmodel.BookingVM.BookingDraft draft)
+            throws BookingValidationException {
+        if (draft.getName() == null || draft.getName().trim().isEmpty()) {
+            throw new BookingValidationException("Name is required.");
+        }
+        java.sql.Timestamp from = draft.getAssignFrom();
+        java.sql.Timestamp to   = draft.getAssignTo();
+        if (from != null && to != null && !from.before(to)) {
+            throw new BookingValidationException("Start time must be before end time.");
+        }
+        if (draft.isWeekly() && draft.getWeeklyEndDate() == null) {
+            throw new BookingValidationException("Weekly end date is required for weekly bookings.");
+        }
+    }
+
+    /**
      * Escapes a string for safe embedding inside a JavaScript single-quoted string literal.
      * Escape order: backslash first (to avoid double-escaping), then ', ", \n.
      * Carriage returns (\r) are stripped rather than escaped — they are invisible
