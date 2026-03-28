@@ -20,7 +20,6 @@ import org.json.JSONObject;
 import org.osgi.framework.Bundle;
 import org.osgi.framework.FrameworkUtil;
 import org.zkoss.bind.BindUtils;
-import org.zkoss.bind.Binder;
 import org.zkoss.zk.ui.Component;
 import org.zkoss.zk.ui.Executions;
 import org.zkoss.zk.ui.event.Event;
@@ -50,6 +49,8 @@ public class BookingForm extends ADForm
     @Wire("#itemData")
     private Textbox itemData;
 
+    private BookingVM bookingVM;
+
     @Override
     protected void initForm() {
         ClassLoader cl = Thread.currentThread().getContextClassLoader();
@@ -59,8 +60,9 @@ public class BookingForm extends ADForm
             boolean admin = isWritable();
             int userId = Env.getContextAsInt(Env.getCtx(), "#AD_User_ID");
 
+            bookingVM = new BookingVM(Env.getCtx(), admin, userId);
             Map<String, Object> args = new HashMap<>();
-            args.put("vm", new BookingVM(Env.getCtx(), admin, userId));
+            args.put("vm", bookingVM);
             args.put("version", resolvePluginVersion());
             Executions.createComponents("~./zul/meetingroom.zul", this, args);
 
@@ -225,11 +227,7 @@ public class BookingForm extends ADForm
     }
 
     private BookingVM getViewModel() {
-        if (bookingVMContainer == null) return null;
-        Binder binder = (Binder) bookingVMContainer.getAttribute("binder");
-        if (binder == null) return null;
-        Object vm = binder.getViewModel();
-        return (vm instanceof BookingVM) ? (BookingVM) vm : null;
+        return bookingVM;
     }
 
     private boolean isWritable() {
