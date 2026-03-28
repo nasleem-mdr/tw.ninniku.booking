@@ -7,6 +7,7 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
@@ -16,6 +17,7 @@ import org.compiere.model.MResourceType;
 import org.compiere.model.MUser;
 import org.compiere.model.Query;
 import org.compiere.util.Env;
+import org.compiere.util.Msg;
 import org.json.JSONObject;
 import org.zkoss.bind.BindUtils;
 import org.zkoss.bind.annotation.BindingParam;
@@ -62,6 +64,9 @@ public class BookingVM {
     private boolean editMode;
     private String dialogError;
     private BookingDraft draft = new BookingDraft();
+
+    // ── i18n labels (loaded once from AD_Message at construction time) ────────
+    private final Map<String, String> labels = new LinkedHashMap<>();
 
     // ═══════════════════════════════════════════════════════════════════════
     // BookingDraft inner class
@@ -143,12 +148,34 @@ public class BookingVM {
     // Constructor
     // ═══════════════════════════════════════════════════════════════════════
 
+    private void loadLabels() {
+        labels.put("booking",      Msg.getMsg(ctx, "BK_Booking"));
+        labels.put("refresh",      Msg.getMsg(ctx, "BK_Refresh"));
+        labels.put("resource",     Msg.getMsg(ctx, "BK_Resource"));
+        labels.put("week",         Msg.getMsg(ctx, "BK_Week"));
+        labels.put("day",          Msg.getMsg(ctx, "BK_Day"));
+        labels.put("timeline",     Msg.getMsg(ctx, "BK_Timeline"));
+        labels.put("today",        Msg.getMsg(ctx, "BK_Today"));
+        labels.put("newBooking",   Msg.getMsg(ctx, "BK_NewBooking"));
+        labels.put("editBooking",  Msg.getMsg(ctx, "BK_EditBooking"));
+        labels.put("name",         Msg.getMsg(ctx, "BK_Name"));
+        labels.put("memo",         Msg.getMsg(ctx, "BK_Memo"));
+        labels.put("start",        Msg.getMsg(ctx, "BK_Start"));
+        labels.put("end",          Msg.getMsg(ctx, "BK_End"));
+        labels.put("weekly",       Msg.getMsg(ctx, "BK_Weekly"));
+        labels.put("repeatUntil",  Msg.getMsg(ctx, "BK_RepeatUntil"));
+        labels.put("save",         Msg.getMsg(ctx, "BK_Save"));
+        labels.put("delete",       Msg.getMsg(ctx, "BK_Delete"));
+        labels.put("cancel",       Msg.getMsg(ctx, "BK_Cancel"));
+    }
+
     public BookingVM(Properties ctx, boolean isAdmin, int currentUserId) {
         this.ctx = ctx;
         this.isAdmin = isAdmin;
         this.currentUserId = currentUserId;
         this.bookingService = new BookingService(ctx);
         this.currentViewDate = new Timestamp(System.currentTimeMillis());
+        loadLabels();
     }
 
     // ═══════════════════════════════════════════════════════════════════════
@@ -760,4 +787,5 @@ public class BookingVM {
     public boolean isEditMode()                             { return editMode; }
     public String getDialogError()                          { return dialogError; }
     public BookingDraft getDraft()                          { return draft; }
+    public Map<String, String> getLabels()                  { return labels; }
 }
