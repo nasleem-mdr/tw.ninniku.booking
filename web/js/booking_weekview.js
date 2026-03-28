@@ -6,6 +6,16 @@
 var BookingApp = BookingApp || {};
 BookingApp.WeekView = (function () {
 
+    // ── ZK event bridge ──────────────────────────────────────────────────────
+    function sendZkBookingEvent(eventName, data) {
+        var vmContainer = zk.Widget.$('$bookingVMContainer');
+        if (vmContainer) {
+            zAu.send(new zk.Event(vmContainer, eventName, data));
+        } else {
+            console.warn('bookingVMContainer not found for event:', eventName);
+        }
+    }
+
     // ---------------------------------------------------------------------------
     // Private helpers (absorbed from meetingroom.zul inline script)
     // ---------------------------------------------------------------------------
@@ -463,20 +473,7 @@ BookingApp.WeekView = (function () {
     function onWeekEventDelete(event, id) {
         event.stopPropagation();
         if (confirm('Are you sure you want to delete this booking?')) {
-            var itemDataWidget = zk.Widget.$('$itemData');
-            var bookingDeletedWidget = zk.Widget.$('$bookingDeleted');
-            var json = JSON.stringify({ id: String(id) });
-
-            if (itemDataWidget && bookingDeletedWidget) {
-                itemDataWidget.setValue(json);
-                itemDataWidget.fireOnChange();
-                bookingDeletedWidget.setValue('DELETE-' + id);
-                bookingDeletedWidget.fireOnChange();
-            } else {
-                var $jq = window.$ || window.jQuery || window.jq;
-                $jq('#itemData').val(json).trigger('change');
-                $jq('#bookingDeleted').val('DELETE-' + id).trigger('change');
-            }
+            sendZkBookingEvent('onBookingDelete', String(id));
         }
     }
 
@@ -520,118 +517,38 @@ BookingApp.WeekView = (function () {
     }
 
     function clickNew(item, callback) {
-        updateMeetingRoomSelector();
-        $(".weekly").show();
-        $('#is-weekly').removeAttr('checked');
-        showBeforeDate();
-
-        var start = new Date(item.start);
-        var end = new Date(item.end);
-
-        $("#booking-name").val("");
-        $("#description").val("");
-        $("#assign-date-from").val(start.toISOString().slice(0, 16));
-        $("#assign-date-to").val(end.toISOString().slice(0, 16));
-        $("#s_resource_id").val(item.group);
-        $("#s_booking_id").val(0);
-
-        $(".input-error").removeClass("input-error");
-        $(".error-text").remove();
-
-        $("#update-form").dialog({
-            title: "Added New Booking",
-            modal: true,
-            width: "500px",
-            buttons: {
-                Ok: function () {
-                    if (!validateBookingForm()) return;
-
-                    $(this).dialog("close");
-                    $("#assign-date-from-timestamp").val(toTimestamp($("#assign-date-from").val()));
-                    $("#assign-date-to-timestamp").val(toTimestamp($("#assign-date-to").val()));
-                    $("#repeat-date-to-timestamp").val(toTimestamp($("#repeat-date-to").val()));
-
-                    var json = convertFormToJSON($("#booking-form"));
-                    if (!json.hasOwnProperty("s_booking_id") || json["s_booking_id"] === "") {
-                        json["s_booking_id"] = "0";
-                    }
-                    zk.Widget.$("$itemData").setValue(JSON.stringify(json));
-                    zk.Widget.$("$itemData").fireOnChange();
-                    zk.Widget.$("$bookingUpdated").setValue(Date.now().toString());
-                    zk.Widget.$("$bookingUpdated").fireOnChange();
-
-                    if (callback) callback(item);
-                },
-                Cancel: function () {
-                    $(this).dialog("close");
-                    if (callback) callback(null);
-                }
-            }
+        var startMs = item.start instanceof Date ? item.start.getTime() : Number(item.start);
+        var endMs   = item.end   instanceof Date ? item.end.getTime()   : Number(item.end);
+        var resId   = item.group || 0;
+        var json = JSON.stringify({
+            's_booking_id':              '0',
+            's_resource_id':             String(resId),
+            'booking-name':              '',
+            'description':               '',
+            'startTimestamp':            String(startMs),
+            'endTimestamp':              String(endMs),
+            'assign-date-from-timestamp': String(startMs),
+            'assign-date-to-timestamp':   String(endMs)
         });
+        sendZkBookingEvent('onBookingAdd', json);
+        if (callback) callback(null);
     }
 
     function openEditDialog(item, callback) {
-        $(".weekly").hide();
-        $("#s_resource_id").val(item.group);
-        $("#s_booking_id").val(item.s_booking_id);
-        $("#group").val(item.group);
-        $("#booking-name").val(item.name ? item.name : item.content);
-        $("#description").val(item.description);
-
-        var start = new Date(item.start);
-        var end = new Date(item.end);
-
-        $("#assign-date-from").val(start.toISOString().slice(0, 16));
-        $("#assign-date-to").val(end.toISOString().slice(0, 16));
-
-        $(".input-error").removeClass("input-error");
-        $(".error-text").remove();
-
-        $("#update-form").dialog({
-            title: "Edit Booking",
-            modal: true,
-            width: "500px",
-            buttons: {
-                "Delete": function () {
-                    if (confirm("Are you sure you want to delete this booking?")) {
-                        $(this).dialog("close");
-                        if (!item.id && item.s_booking_id) item.id = item.s_booking_id;
-                        zk.Widget.$("$itemData").setValue(JSON.stringify(item));
-                        zk.Widget.$("$itemData").fireOnChange();
-                        zk.Widget.$("$bookingDeleted").setValue(Date.now().toString());
-                        zk.Widget.$("$bookingDeleted").fireOnChange();
-                        if (callback) callback(null);
-                    }
-                },
-                Ok: function () {
-                    if (!validateBookingForm()) return;
-
-                    $(this).dialog("close");
-                    if (item) {
-                        item.description = $("#description").val();
-                        item.group = $("#group").val();
-                    }
-                    $("#assign-date-from-timestamp").val(toTimestamp($("#assign-date-from").val()));
-                    $("#assign-date-to-timestamp").val(toTimestamp($("#assign-date-to").val()));
-
-                    var json = convertFormToJSON($("#booking-form"));
-                    if (!json.hasOwnProperty("s_booking_id") || json["s_booking_id"] === "") {
-                        var val = $("#s_booking_id").val();
-                        json["s_booking_id"] = (val === undefined || val === null) ? "0" : val;
-                    }
-                    zk.Widget.$("$itemData").setValue(JSON.stringify(json));
-                    zk.Widget.$("$itemData").fireOnChange();
-                    zk.Widget.$("$bookingUpdated").setValue(Date.now().toString());
-                    zk.Widget.$("$bookingUpdated").fireOnChange();
-
-                    if (callback) callback(item);
-                },
-                Cancel: function () {
-                    $(this).dialog("close");
-                    if (callback) callback(null);
-                }
-            }
+        var startMs = item.start instanceof Date ? item.start.getTime() : Number(item.start);
+        var endMs   = item.end   instanceof Date ? item.end.getTime()   : Number(item.end);
+        var json = JSON.stringify({
+            's_booking_id':              String(item.id || item.s_booking_id || 0),
+            's_resource_id':             String(item.group || 0),
+            'booking-name':              item.name || item.content || '',
+            'description':               item.description || '',
+            'startTimestamp':            String(startMs),
+            'endTimestamp':              String(endMs),
+            'assign-date-from-timestamp': String(startMs),
+            'assign-date-to-timestamp':   String(endMs)
         });
+        sendZkBookingEvent('onBookingEdit', json);
+        if (callback) callback(item);
     }
 
     // ---------------------------------------------------------------------------
