@@ -2,7 +2,7 @@ Manifest-Version: 1.0
 Bundle-ManifestVersion: 2
 Bundle-Name: Booking
 Bundle-SymbolicName: tw.ninniku.booking;singleton:=true
-Bundle-Version: 3.1.33.qualifier
+Bundle-Version: 3.1.4.qualifier
 Bundle-Activator: tw.ninniku.booking.Activator
 Require-Bundle: org.adempiere.ui.zk,
  org.adempiere.base,
@@ -25,19 +25,15 @@ Import-Package: com.google.gson,
  org.osgi.framework,
  org.adempiere.webui.panel,
  org.zkoss;version="[9.6.0,10.0.0]",
- org.zkoss.bind,
- org.zkoss.bind.annotation,
  org.zkoss.image;version="[9.6.0,10.0.0]",
  org.zkoss.zhtml;version="[9.6.0,10.0.0]",
  org.zkoss.zk.ui;version="[9.6.0,10.0.0]",
  org.zkoss.zk.ui.event;version="[9.6.0,10.0.0]",
  org.zkoss.zk.ui.http;version="[9.6.0,10.0.0]",
- org.zkoss.zk.ui.select,
- org.zkoss.zk.ui.select.annotation,
  org.zkoss.zk.ui.util;version="[9.6.0,10.0.0]",
  org.zkoss.zul;version="[9.6.0,10.0.0]"
 Service-Component: OSGI-INF/tw.ninniku.booking.model.factory.xml,
  OSGI-INF/tw.ninniku.booking.form.factory.xml,
  OSGI-INF/tw.ninniku.booking.process.factory.xml
-Bundle-ClassPath: src/,
- .
+Bundle-ClassPath: .,
+ src/
