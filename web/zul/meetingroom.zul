@@ -115,9 +115,6 @@
     <button mold="os" label="&lt;"  onClick="@command('prevPeriod')"/>
     <button mold="os" label="Today" onClick="@command('today')"/>
     <button mold="os" label="&gt;"  onClick="@command('nextPeriod')"/>
-    <separator bar="true"/>
-    <!-- chkWorkHours NOT bound to VM — JS reads it via DOM; id must be preserved -->
-    <checkbox id="chkWorkHours" label="Only Work Hours" checked="true"/>
   </toolbar>
 
   <!-- Error label -->
