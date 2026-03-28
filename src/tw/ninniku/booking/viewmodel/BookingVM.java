@@ -71,6 +71,7 @@ public class BookingVM {
         private int bookingId;
         private int sResourceId;
         private String resourceName = "";
+        private Group selectedGroup;
         private String name = "";
         private String description = "";
         private java.util.Date startDate;
@@ -84,6 +85,11 @@ public class BookingVM {
         public void setBookingId(int v)                  { this.bookingId = v; }
         public int getSResourceId()                      { return sResourceId; }
         public void setSResourceId(int v)                { this.sResourceId = v; }
+        public Group getSelectedGroup()                  { return selectedGroup; }
+        public void setSelectedGroup(Group g) {
+            this.selectedGroup = g;
+            if (g != null) this.sResourceId = Integer.parseInt(String.valueOf(g.getId()));
+        }
         public String getResourceName()                  { return resourceName; }
         public void setResourceName(String v)            { this.resourceName = v != null ? v : ""; }
         public String getName()                          { return name; }
@@ -235,6 +241,7 @@ public class BookingVM {
         if (selectedResourceType != null) {
             draft.setSResourceId(getFirstResourceIdForType(selectedResourceType.getS_ResourceType_ID()));
         }
+        draft.setSelectedGroup(findGroupById(draft.getSResourceId()));
         editMode = false;
         dialogError = null;
         dialogVisible = true;
@@ -297,6 +304,7 @@ public class BookingVM {
         int resId = (int) parseLong(json, "s_resource_id", 0);
         draft.setSResourceId(resId);
         draft.setResourceName(resolveResourceName(resId));
+        draft.setSelectedGroup(findGroupById(resId));
         draft.setName(json.optString("booking-name", ""));
         draft.setDescription(json.optString("description", ""));
         long startMs = parseLong(json, "assign-date-from-timestamp", 0);
@@ -329,6 +337,7 @@ public class BookingVM {
         int resId = (int) parseLong(json, "s_resource_id", 0);
         draft.setSResourceId(resId);
         draft.setResourceName(resolveResourceName(resId));
+        draft.setSelectedGroup(findGroupById(resId));
         long startMs = parseLong(json, "assign-date-from-timestamp", 0);
         long endMs   = parseLong(json, "assign-date-to-timestamp", 0);
         java.util.Date start = startMs > 0 ? new java.util.Date(startMs) : new java.util.Date();
@@ -425,6 +434,15 @@ public class BookingVM {
         List<Group> g = bookingService.fetchGroups(resourceTypeId);
         if (!g.isEmpty()) return Integer.parseInt(String.valueOf(g.get(0).getId()));
         return 0;
+    }
+
+    private Group findGroupById(int sResourceId) {
+        for (Group g : groups) {
+            try {
+                if (Integer.parseInt(String.valueOf(g.getId())) == sResourceId) return g;
+            } catch (NumberFormatException ignore) { }
+        }
+        return groups.isEmpty() ? null : groups.get(0);
     }
 
     private String resolveResourceName(int sResourceId) {
@@ -733,6 +751,7 @@ public class BookingVM {
     public List<MResourceType> getResourceTypes()          { return resourceTypes; }
     public MResourceType getSelectedResourceType()          { return selectedResourceType; }
     public void setSelectedResourceType(MResourceType v)    { this.selectedResourceType = v; }
+    public List<Group> getResources()                       { return groups; }
     public String getViewMode()                             { return viewMode; }
     public String getBookingHtml()                          { return bookingHtml != null ? bookingHtml : ""; }
     public String getErrorMessage()                         { return errorMessage; }

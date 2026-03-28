@@ -134,7 +134,13 @@
         <rows>
           <row>
             <label value="Resource"/>
-            <label value="@load(vm.draft.resourceName)"/>
+            <listbox mold="select" width="200px"
+                     model="@load(vm.resources)"
+                     selectedItem="@bind(vm.draft.selectedGroup)">
+              <template name="model" var="r">
+                <listitem label="@load(r.content)" value="@load(r)"/>
+              </template>
+            </listbox>
           </row>
           <row>
             <label value="Name *"/>
