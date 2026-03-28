@@ -164,6 +164,7 @@ BookingApp.WeekView = (function () {
         $(document).off('mousedown', '.day-col');
         $(document).off('mousedown', '.resize-handle');
         $(document).off('mousedown', '.event-card');
+        $(document).off('dblclick', '.day-col');
         $(document).off('mousemove.weekview');
         $(document).off('mouseup.weekview');
 
@@ -221,7 +222,26 @@ BookingApp.WeekView = (function () {
             _wasDragging = false;
         });
 
-        // 3. Create Start (Clicking empty space)
+        // 3a. Double-click on empty space → open Add Booking dialog at that time
+        $(document).on('dblclick', '.day-col', function (e) {
+            if ($(e.target).closest('.event-card').length > 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            var col = $(this);
+            var rect = this.getBoundingClientRect();
+            var offsetY = e.clientY - rect.top;
+            var dayKey = col.data('date');
+            var resId = col.data('resource-id');
+            if (!dayKey) return;
+
+            var start = getTimeFromY(offsetY, dayKey);
+            snapTo30(start);
+            var end = new Date(start.getTime() + 60 * 60000);
+            openCustomAddDialogRange(start.getTime(), end.getTime(), resId);
+        });
+
+        // 3b. Create Start (drag on empty space)
         $(document).on('mousedown', '.day-col', function (e) {
             if ($(e.target).closest('.event-card').length > 0) return;
             e.preventDefault();
