@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<zk>
+<window id="bookingVMContainer" border="none" width="100%" height="100%"
+        style="background-color:green" contentStyle="overflow:auto;"
+        viewModel="@id('vm') @init(arg.vm)">
+
+  <!-- Third-party: CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/vis-timeline@7/dist/vis-timeline-graph2d.min.js"/>
+  <script src="https://cdn.jsdelivr.net/npm/jquery-ui@1.13/dist/jquery-ui.min.js"/>
+  <script src="https://cdn.jsdelivr.net/npm/jquery-toast-plugin@1.3.2/dist/jquery.toast.min.js"/>
+
+  <!-- Custom JS: bundle classpath -->
+  <script src="~./js/booking.js"/>
+  <script src="~./js/booking_weekview.js"/>
+
+  <!-- Third-party styles: CDN -->
+  <style src="https://cdn.jsdelivr.net/npm/vis-timeline@7/dist/vis-timeline-graph2d.min.css"/>
+  <style src="https://cdn.jsdelivr.net/npm/jquery-ui@1.13/dist/themes/base/jquery-ui.min.css"/>
+  <style src="https://cdn.jsdelivr.net/npm/jquery-toast-plugin@1.3.2/dist/jquery.toast.min.css"/>
+
+  <!-- Custom styles: bundle classpath -->
+  <style src="~./styles/booking.css"/>
+
+  <!-- Inline week/day view styles (unchanged from original) -->
+  <style>
+.week-view-root { font-family: 'Roboto', sans-serif; height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.week-header { display: flex; height: 40px; border-bottom: 2px solid #ddd; background: #f5f5f5; flex-shrink: 0; }
+.header-time-spacer { width: 60px; min-width: 60px; border-right: 1px solid #eee; background: #f9f9f9; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; line-height: 40px; text-align: center; }
+.header-day { flex: 1; text-align: center; line-height: 40px; font-weight: bold; font-size: 13px; color: #444; border-right: 1px solid #eee; }
+.scroll-body { flex: 1; overflow-y: auto; position: relative; min-height: 0; display: flex; flex-direction: column; }
+.week-layout { display: flex; flex-direction: row; background: white; border: 1px solid #ddd; min-height: 440px; flex: 1; }
+.time-col { width: 60px; flex-shrink: 0; background: #f8f9fa; border-right: 1px solid #ddd; }
+.time-slot { height: 40px; border-bottom: 1px solid #e0e0e0; font-size: 11px; color: #666; display: flex; align-items: start; justify-content: center; padding-top: 2px; box-sizing: border-box; }
+.days-grid { flex: 1; display: flex; position: relative; }
+.day-col { flex: 1; border-right: 1px solid #eee; position: relative; height: 100%; background: repeating-linear-gradient(to bottom, transparent 0, transparent 39px, #f5f5f5 40px); cursor: pointer; }
+.event-card { position: absolute; font-size: 11px; color: white; border-radius: 3px; padding: 2px 4px; overflow: hidden; box-shadow: 0 1px 2px rgba(0,0,0,0.2); z-index: 10; cursor: pointer; }
+.event-card.editable { cursor: grab; }
+.event-card.editable:active { cursor: grabbing; }
+.drag-ghost { position: absolute; background: rgba(33,150,243,0.6); border: 2px solid #1565C0; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 100; pointer-events: none; }
+.current-time-line { position: absolute; left: 0; width: 100%; border-top: 2px solid red; z-index: 100; pointer-events: none; display: none; }
+.drag-tooltip { position: fixed; background: rgba(0,0,0,0.8); color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; pointer-events: none; z-index: 2147483647; white-space: nowrap; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+.delete-icon { position: absolute; top: 2px; right: 2px; width: 16px; height: 16px; line-height: 16px; text-align: center; color: rgba(255,255,255,0.7); font-weight: bold; cursor: pointer; border-radius: 50%; z-index: 20; }
+.delete-icon:hover { color: #fff; background-color: rgba(255,0,0,0.7); }
+.resize-handle { position: absolute; bottom: 0; left: 0; width: 100%; height: 8px; cursor: ns-resize; z-index: 30; }
+.event-card.dragging { opacity: 0.5; box-shadow: 0 4px 8px rgba(0,0,0,0.3); z-index: 100 !important; pointer-events: none; }
+.input-error { border: 2px solid #D32F2F !important; background-color: #FFEBEE !important; }
+.error-text { color: #D32F2F; font-size: 11px; display: block; margin-top: 2px; font-weight: bold; }
+.booking-error-label { color: #D32F2F; font-size: 12px; padding: 4px 8px; }
+.booking-dialog-footer { text-align: right; padding: 8px; }
+.booking-dialog-footer button { margin-left: 6px; }
+  </style>
+
+  <!-- Toolbar -->
+  <toolbar>
+    <label value="Booking"/>
+    <separator bar="true"/>
+    <label value="Version ${arg.version}"/>
+    <separator bar="true"/>
+    <button mold="os" label="Refresh" onClick="@command('refresh')"/>
+    <separator bar="true"/>
+    <label value="Resource:"/>
+    <listbox mold="select"
+             model="@load(vm.resourceTypes)"
+             selectedItem="@bind(vm.selectedResourceType)"
+             onChange="@command('refresh')">
+      <template name="model" var="rt">
+        <listitem label="@load(rt.name)" value="@load(rt)"/>
+      </template>
+    </listbox>
+    <separator bar="true"/>
+    <button mold="os" label="Add Booking"
+            onClick="@command('openAddDialog')"
+            style="background-color:#1976D2;color:black;font-weight:bold;border-radius:4px;box-shadow:0 2px 5px rgba(0,0,0,0.2);"/>
+    <separator bar="true"/>
+    <button mold="os" label="Week"     onClick="@command('changeViewMode', mode='week')"/>
+    <button mold="os" label="Day"      onClick="@command('changeViewMode', mode='day')"/>
+    <button mold="os" label="Timeline" onClick="@command('changeViewMode', mode='timeline')"/>
+    <separator bar="true"/>
+    <button mold="os" label="&lt;"  onClick="@command('prevPeriod')"/>
+    <button mold="os" label="Today" onClick="@command('today')"/>
+    <button mold="os" label="&gt;"  onClick="@command('nextPeriod')"/>
+    <separator bar="true"/>
+    <!-- chkWorkHours NOT bound to VM — JS reads it via DOM; id must be preserved -->
+    <checkbox id="chkWorkHours" label="Only Work Hours" checked="true"/>
+  </toolbar>
+
+  <!-- Error label -->
+  <label value="@load(vm.errorMessage)" sclass="booking-error-label"
+         visible="@load(not empty vm.errorMessage)"/>
+
+  <!-- Booking view container: HTML component bound to vm.bookingHtml -->
+  <div id="bookingContainer" hflex="1" vflex="1">
+    <html content="@load(vm.bookingHtml)" hflex="1" vflex="1"/>
+  </div>
+
+  <!-- Hidden textboxes for drag-drop/resize (timeline only) -->
+  <div style="display:none;">
+    <textbox id="dateLast" visible="false"/>
+    <textbox id="itemData" visible="false"/>
+  </div>
+
+  <!-- Booking dialog: ZK modal replacing native HTML form -->
+  <window title="@load(vm.editMode ? '編輯預約' : '新增預約')"
+          border="normal" width="500px" mode="modal"
+          visible="@load(vm.dialogVisible)"
+          closable="true" onClose="@command('closeDialog')">
+    <grid>
+      <rows>
+        <row>
+          <label value="Resource"/>
+          <label value="@load(vm.draft.resourceName)"/>
+        </row>
+        <row>
+          <label value="Name *"/>
+          <textbox value="@bind(vm.draft.name)" width="300px"/>
+        </row>
+        <row>
+          <label value="Memo"/>
+          <textbox value="@bind(vm.draft.description)" width="300px" rows="3"/>
+        </row>
+        <row>
+          <label value="Start"/>
+          <hlayout>
+            <datebox value="@bind(vm.draft.startDate)" format="yyyy-MM-dd" width="130px"/>
+            <timebox value="@bind(vm.draft.startTime)" format="HH:mm" width="80px"/>
+          </hlayout>
+        </row>
+        <row>
+          <label value="End"/>
+          <hlayout>
+            <datebox value="@bind(vm.draft.endDate)" format="yyyy-MM-dd" width="130px"/>
+            <timebox value="@bind(vm.draft.endTime)" format="HH:mm" width="80px"/>
+          </hlayout>
+        </row>
+        <row>
+          <label value="Weekly"/>
+          <checkbox checked="@bind(vm.draft.weekly)"/>
+        </row>
+        <row visible="@load(vm.draft.weekly)">
+          <label value="Repeat Until"/>
+          <datebox value="@bind(vm.draft.weeklyEndDate)" format="yyyy-MM-dd" width="130px"/>
+        </row>
+        <row>
+          <label value=""/>
+          <label value="@load(vm.dialogError)" sclass="error-text"
+                 visible="@load(not empty vm.dialogError)"/>
+        </row>
+      </rows>
+    </grid>
+    <div sclass="booking-dialog-footer">
+      <button label="Save"   onClick="@command('saveBooking')"
+              style="background-color:#1976D2;color:white;padding:4px 12px;"/>
+      <button label="Delete" onClick="@command('deleteBooking')"
+              visible="@load(vm.editMode)"/>
+      <button label="Cancel" onClick="@command('closeDialog')"/>
+    </div>
+  </window>
+
+</window>
+</zk>
