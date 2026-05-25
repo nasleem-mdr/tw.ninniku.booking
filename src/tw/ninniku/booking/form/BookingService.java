@@ -8,8 +8,11 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 import java.util.Properties;
+import java.util.logging.Logger;
 
 import org.adempiere.exceptions.AdempiereException;
+import org.compiere.model.MWFActivity;
+import org.compiere.model.MWorkflow;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
 import org.compiere.util.Msg;
