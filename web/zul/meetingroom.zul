@@ -118,6 +118,22 @@
     <button mold="os" label="@load(vm.labels.today)"    onClick="@command('today')"/>
     <button mold="os" label="&gt;"  onClick="@command('nextPeriod')"/>
     <label value="Version ${arg.version}" style="margin-left:auto;color:#888;font-size:11px;padding-right:6px;"/>
+    <separator bar="true"/>
+    <label value="Status:"/>
+    <label value="@load(vm.draftDocStatus)" style="font-weight:bold;"/>
+    <separator bar="true"/>
+    <button mold="os" label="Submit"
+            visible="@load(vm.draftDocStatus eq 'DR')"
+            onClick="@command('submitBooking')"/>
+    <button mold="os" label="Approve"
+            visible="@load(vm.draftDocStatus eq 'IP' and vm.admin)"
+            onClick="@command('approveBooking')"/>
+    <button mold="os" label="Reject"
+            visible="@load(vm.draftDocStatus eq 'IP' and vm.admin)"
+            onClick="@command('rejectBooking')"/>
+    <button mold="os" label="Void"
+            visible="@load(vm.draftDocStatus ne 'VO')"
+            onClick="@command('voidBooking')"/>
   </toolbar>
 
   <!-- Error label -->
@@ -158,6 +174,26 @@
             <label value="@load(vm.labels.memo)"/>
             <textbox value="@bind(vm.draft.description)" width="300px" rows="3"/>
           </row>
+        <row visible="@load(vm.editMode)">
+              <label value="Status"/>
+              <hlayout>
+                <label value="@load(vm.draftDocStatus)" style="font-weight:bold; padding:2px 8px;
+                       background:@load(vm.draftDocStatus eq 'AP' ? '#E8F5E9' :
+                                  vm.draftDocStatus eq 'IP' ? '#FFF3E0' :
+                                  vm.draftDocStatus eq 'VO' ? '#FFEBEE' : '#E3F2FD');
+                       border-radius:4px;"/>
+                <label value="(Pending Approval)"
+                       style="color:#F57C00;"
+                       visible="@load(vm.draftDocStatus eq 'IP')"/>
+                <label value="(Approved)"
+                       style="color:#388E3C;"
+                       visible="@load(vm.draftDocStatus eq 'AP')"/>
+                <label value="(Voided)"
+                       style="color:#C62828;"
+                       visible="@load(vm.draftDocStatus eq 'VO')"/>
+              </hlayout>
+            </row>
+
           <row>
             <label value="@load(vm.labels.start)"/>
             <hlayout>
@@ -193,6 +229,28 @@
         <button label="@load(vm.labels.delete)" onClick="@command('deleteBooking')"
                 visible="@load(vm.editMode)"/>
         <button label="@load(vm.labels.cancel)" onClick="@command('closeDialog')"/>
+        <button label="@load(vm.labels.save)"   onClick="@command('saveBooking')"/>
+    <button label="@load(vm.labels.cancel)" onClick="@command('closeDialog')"/>
+
+    <-- DocAction buttons -->
+    <button label="Submit for Approval"
+            visible="@load(vm.draftDocStatus eq 'DR' or empty vm.draftDocStatus)"
+            onClick="@command('submitBooking')"/>
+
+    <button label="Approve"
+            style="background:#388E3C;color:white;"
+            visible="@load(vm.draftDocStatus eq 'IP' and vm.admin)"
+            onClick="@command('approveBooking')"/>
+
+    <button label="Reject"
+            style="background:#F57C00;color:white;"
+            visible="@load(vm.draftDocStatus eq 'IP' and vm.admin)"
+            onClick="@command('rejectBooking')"/>
+
+    <button label="@load(vm.labels.delete)"
+            style="background:#C62828;color:white;"
+            visible="@load(vm.editMode and vm.draftDocStatus ne 'VO')"
+            onClick="@command('voidBooking')"/>
       </div>
     </div>
   </div>
