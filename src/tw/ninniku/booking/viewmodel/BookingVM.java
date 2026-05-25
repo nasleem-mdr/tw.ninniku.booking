@@ -55,6 +55,12 @@ public class BookingVM {
 
     // ── rendered HTML (bound to <html> component in ZUL) ────────────────────
     private String bookingHtml = "";
+    
+    // ── Getter (add to BookingVM) ──────────────────────────────────────
+
+    public String getDocActionResult() {
+        return docActionResult;
+    }
 
     // ── status ──────────────────────────────────────────────────────────────
     private String errorMessage;
@@ -65,6 +71,11 @@ public class BookingVM {
     private String dialogError;
     private BookingDraft draft = new BookingDraft();
     private int selectedResourceIndex = 0;
+    private String docActionResult;
+    private boolean admin;
+    private int userId;
+    private Object ctx;          // replace with Properties in real VM
+    private int selectedBookingId;  // set from draft.bookingId in real VM
 
     // ── i18n labels (loaded once from AD_Message at construction time) ────────
     private final Map<String, String> labels = new LinkedHashMap<>();
@@ -789,6 +800,99 @@ public class BookingVM {
             + "}";
         return BookingDTO.fromJson(raw);
     }
+    /**
+     * "Submit for Approval" — transitions DR → IP.
+     * Bind to a toolbar button visible when DocStatus == DR.
+     */
+    @Command("submitBooking")
+    @NotifyChange({"docActionResult", "errorMessage", "bookingHtml"})
+    public void submitBooking() {
+        int bookingId = getSelectedBookingId();
+        if (bookingId <= 0) { setError("No booking selected."); return; }
+        try {
+            BookingService svc = new BookingService(getCtx());
+            MResourceAssignment ra = svc.processDocAction(
+                    bookingId,
+                    MResourceAssignment.DOCACTION_Prepare,
+                    isAdmin());
+            docActionResult = "Booking #" + bookingId + " submitted for approval.";
+            clearError();
+            doRefreshView();
+        } catch (BookingValidationException ex) {
+            setError(ex.getMessage());
+        } catch (Exception ex) {
+            setError("Submit failed: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * "Approve" — admin only, transitions IP → AP.
+     * Bind to a button visible when DocStatus == IP AND user is admin.
+     */
+    @Command("approveBooking")
+    @NotifyChange({"docActionResult", "errorMessage", "bookingHtml"})
+    public void approveBooking() {
+        int bookingId = getSelectedBookingId();
+        if (bookingId <= 0) { setError("No booking selected."); return; }
+        try {
+            BookingService svc = new BookingService(getCtx());
+            MResourceAssignment ra = svc.processDocAction(
+                    bookingId,
+                    MResourceAssignment.DOCACTION_Approve,
+                    isAdmin());
+            docActionResult = "Booking #" + bookingId + " approved.";
+            clearError();
+            doRefreshView();
+        } catch (BookingValidationException ex) {
+            setError(ex.getMessage());
+        } catch (Exception ex) {
+            setError("Approve failed: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * "Reject / Send back" — admin only, transitions IP → DR.
+     */
+    @Command("rejectBooking")
+    @NotifyChange({"docActionResult", "errorMessage", "bookingHtml"})
+    public void rejectBooking() {
+        int bookingId = getSelectedBookingId();
+        if (bookingId <= 0) { setError("No booking selected."); return; }
+        try {
+            // rejectIt() moves IP → DR; no dedicated service method needed
+            MResourceAssignment ra = new MResourceAssignment(getCtx(), bookingId, null);
+            ra.rejectIt();
+            ra.saveEx();
+            docActionResult = "Booking #" + bookingId + " sent back to requester.";
+            clearError();
+            doRefreshView();
+        } catch (Exception ex) {
+            setError("Reject failed: " + ex.getMessage());
+        }
+    }
+
+    /**
+     * "Void" — removes/cancels a booking (soft-delete via DocStatus=VO).
+     * Replaces the raw-delete used previously.
+     */
+    @Command("voidBooking")
+    @NotifyChange({"docActionResult", "errorMessage", "bookingHtml"})
+    public void voidBooking() {
+        int bookingId = getSelectedBookingId();
+        if (bookingId <= 0) { setError("No booking selected."); return; }
+        try {
+            BookingService svc = new BookingService(getCtx());
+            svc.deleteBooking(bookingId, isAdmin(), getUserId());
+            docActionResult = "Booking #" + bookingId + " voided.";
+            clearError();
+            doRefreshView();
+            closeDialog();
+        } catch (BookingValidationException ex) {
+            setError(ex.getMessage());
+        } catch (Exception ex) {
+            setError("Void failed: " + ex.getMessage());
+        }
+    }
 
     // ═══════════════════════════════════════════════════════════════════════
     // Getters for ZUL binding
@@ -809,4 +913,14 @@ public class BookingVM {
     public int getSelectedResourceIndex()                   { return selectedResourceIndex; }
     public void setSelectedResourceIndex(int v)             { this.selectedResourceIndex = v; }
     public Map<String, String> getLabels()                  { return labels; }
+    
+    private int getSelectedBookingId() { return selectedBookingId; }
+    private java.util.Properties getCtx() { return (java.util.Properties) ctx; }
+    private boolean isAdmin() { return admin; }
+    private int getUserId() { return userId; }
+    private void setError(String msg) { /* vm.setErrorMessage(msg) */ }
+    private void clearError() { /* vm.setErrorMessage(null) */ }
+    public void doRefreshView() { /* existing refresh logic */ }
+    public void closeDialog() { /* existing close dialog logic */ }
+
 }
