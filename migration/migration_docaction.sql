@@ -44,107 +44,140 @@ WHERE DocStatus = 'DR';   -- only touches rows that got the default
 
 DO $$
 DECLARE
-    v_table_id   INTEGER;
-    v_client_id  INTEGER := 1000000;   -- your AD_Client_ID
-    v_org_id     INTEGER := 0;
+    v_table_id    INTEGER;
+    v_client_id   INTEGER := 1000000;   -- ganti dengan AD_Client_ID Anda
+    v_org_id      INTEGER := 0;
+    v_next_id     INTEGER;
 BEGIN
     SELECT AD_Table_ID INTO v_table_id
     FROM AD_Table WHERE TableName = 'S_ResourceAssignment';
 
+    -- Ambil next ID dari AD_Sequence
+    SELECT currentnext INTO v_next_id
+    FROM AD_Sequence WHERE name = 'AD_Column';
+
     -- DocStatus
-    INSERT INTO AD_Column (
-        AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive, Created, CreatedBy, Updated, UpdatedBy,
-        ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength, IsKey, IsParent,
-        IsMandatory, IsUpdateable, IsAlwaysUpdateable, Name, Description,
-        AD_Element_ID, EntityType, Version
-    )
-    SELECT nextval('AD_Column_Seq'), v_client_id, v_org_id, 'Y',
-           now(), 100, now(), 100,
-           'DocStatus', v_table_id,
-           17,   -- Reference: List
-           2, 'N', 'N', 'Y', 'Y', 'N',
-           'Document Status', 'Current document status',
-           289,  -- standard AD_Element_ID for DocStatus
-           'U', 1
-    WHERE NOT EXISTS (
+    IF NOT EXISTS (
         SELECT 1 FROM AD_Column
         WHERE AD_Table_ID = v_table_id AND ColumnName = 'DocStatus'
-    );
+    ) THEN
+        INSERT INTO AD_Column (
+            AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive,
+            Created, CreatedBy, Updated, UpdatedBy,
+            ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength,
+            IsKey, IsParent, IsMandatory, IsUpdateable, IsAlwaysUpdateable,
+            Name, Description, AD_Element_ID, EntityType, Version
+        ) VALUES (
+            v_next_id, v_client_id, v_org_id, 'Y',
+            now(), 100, now(), 100,
+            'DocStatus', v_table_id, 17, 2,
+            'N', 'N', 'Y', 'Y', 'N',
+            'Document Status', 'Current document status',
+            289, 'U', 1
+        );
+        -- Update AD_Sequence setelah pakai
+        UPDATE AD_Sequence SET currentnext = v_next_id + 1
+        WHERE name = 'AD_Column';
+        v_next_id := v_next_id + 1;
+    END IF;
 
     -- DocAction
-    INSERT INTO AD_Column (
-        AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive, Created, CreatedBy, Updated, UpdatedBy,
-        ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength, IsKey, IsParent,
-        IsMandatory, IsUpdateable, IsAlwaysUpdateable, Name, Description,
-        AD_Element_ID, EntityType, Version
-    )
-    SELECT nextval('AD_Column_Seq'), v_client_id, v_org_id, 'Y',
-           now(), 100, now(), 100,
-           'DocAction', v_table_id,
-           28,   -- Reference: Button
-           2, 'N', 'N', 'Y', 'Y', 'N',
-           'Document Action', 'The targeted status of the document',
-           287,  -- standard AD_Element_ID for DocAction
-           'U', 1
-    WHERE NOT EXISTS (
+    IF NOT EXISTS (
         SELECT 1 FROM AD_Column
         WHERE AD_Table_ID = v_table_id AND ColumnName = 'DocAction'
-    );
+    ) THEN
+        INSERT INTO AD_Column (
+            AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive,
+            Created, CreatedBy, Updated, UpdatedBy,
+            ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength,
+            IsKey, IsParent, IsMandatory, IsUpdateable, IsAlwaysUpdateable,
+            Name, Description, AD_Element_ID, EntityType, Version
+        ) VALUES (
+            v_next_id, v_client_id, v_org_id, 'Y',
+            now(), 100, now(), 100,
+            'DocAction', v_table_id, 28, 2,
+            'N', 'N', 'Y', 'Y', 'N',
+            'Document Action', 'The targeted status of the document',
+            287, 'U', 1
+        );
+        UPDATE AD_Sequence SET currentnext = v_next_id + 1
+        WHERE name = 'AD_Column';
+        v_next_id := v_next_id + 1;
+    END IF;
 
     -- Processing
-    INSERT INTO AD_Column (
-        AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive, Created, CreatedBy, Updated, UpdatedBy,
-        ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength, IsKey, IsParent,
-        IsMandatory, IsUpdateable, IsAlwaysUpdateable, Name, Description,
-        AD_Element_ID, EntityType, Version
-    )
-    SELECT nextval('AD_Column_Seq'), v_client_id, v_org_id, 'Y',
-           now(), 100, now(), 100,
-           'Processing', v_table_id,
-           20, 1, 'N', 'N', 'Y', 'Y', 'N',
-           'Process Now', 'Set this to trigger processing',
-           524, 'U', 1
-    WHERE NOT EXISTS (
+    IF NOT EXISTS (
         SELECT 1 FROM AD_Column
         WHERE AD_Table_ID = v_table_id AND ColumnName = 'Processing'
-    );
+    ) THEN
+        INSERT INTO AD_Column (
+            AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive,
+            Created, CreatedBy, Updated, UpdatedBy,
+            ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength,
+            IsKey, IsParent, IsMandatory, IsUpdateable, IsAlwaysUpdateable,
+            Name, Description, AD_Element_ID, EntityType, Version
+        ) VALUES (
+            v_next_id, v_client_id, v_org_id, 'Y',
+            now(), 100, now(), 100,
+            'Processing', v_table_id, 20, 1,
+            'N', 'N', 'Y', 'Y', 'N',
+            'Process Now', 'Set this to trigger processing',
+            524, 'U', 1
+        );
+        UPDATE AD_Sequence SET currentnext = v_next_id + 1
+        WHERE name = 'AD_Column';
+        v_next_id := v_next_id + 1;
+    END IF;
 
     -- Processed
-    INSERT INTO AD_Column (
-        AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive, Created, CreatedBy, Updated, UpdatedBy,
-        ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength, IsKey, IsParent,
-        IsMandatory, IsUpdateable, IsAlwaysUpdateable, Name, Description,
-        AD_Element_ID, EntityType, Version
-    )
-    SELECT nextval('AD_Column_Seq'), v_client_id, v_org_id, 'Y',
-           now(), 100, now(), 100,
-           'Processed', v_table_id,
-           20, 1, 'N', 'N', 'Y', 'Y', 'N',
-           'Processed', 'Document has been processed',
-           523, 'U', 1
-    WHERE NOT EXISTS (
+    IF NOT EXISTS (
         SELECT 1 FROM AD_Column
         WHERE AD_Table_ID = v_table_id AND ColumnName = 'Processed'
-    );
+    ) THEN
+        INSERT INTO AD_Column (
+            AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive,
+            Created, CreatedBy, Updated, UpdatedBy,
+            ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength,
+            IsKey, IsParent, IsMandatory, IsUpdateable, IsAlwaysUpdateable,
+            Name, Description, AD_Element_ID, EntityType, Version
+        ) VALUES (
+            v_next_id, v_client_id, v_org_id, 'Y',
+            now(), 100, now(), 100,
+            'Processed', v_table_id, 20, 1,
+            'N', 'N', 'Y', 'Y', 'N',
+            'Processed', 'Document has been processed',
+            523, 'U', 1
+        );
+        UPDATE AD_Sequence SET currentnext = v_next_id + 1
+        WHERE name = 'AD_Column';
+        v_next_id := v_next_id + 1;
+    END IF;
 
     -- IsApproved
-    INSERT INTO AD_Column (
-        AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive, Created, CreatedBy, Updated, UpdatedBy,
-        ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength, IsKey, IsParent,
-        IsMandatory, IsUpdateable, IsAlwaysUpdateable, Name, Description,
-        AD_Element_ID, EntityType, Version
-    )
-    SELECT nextval('AD_Column_Seq'), v_client_id, v_org_id, 'Y',
-           now(), 100, now(), 100,
-           'IsApproved', v_table_id,
-           20, 1, 'N', 'N', 'Y', 'Y', 'N',
-           'Approved', 'Indicates if this document requires approval',
-           351, 'U', 1
-    WHERE NOT EXISTS (
+    IF NOT EXISTS (
         SELECT 1 FROM AD_Column
         WHERE AD_Table_ID = v_table_id AND ColumnName = 'IsApproved'
-    );
+    ) THEN
+        INSERT INTO AD_Column (
+            AD_Column_ID, AD_Client_ID, AD_Org_ID, IsActive,
+            Created, CreatedBy, Updated, UpdatedBy,
+            ColumnName, AD_Table_ID, AD_Reference_ID, FieldLength,
+            IsKey, IsParent, IsMandatory, IsUpdateable, IsAlwaysUpdateable,
+            Name, Description, AD_Element_ID, EntityType, Version
+        ) VALUES (
+            v_next_id, v_client_id, v_org_id, 'Y',
+            now(), 100, now(), 100,
+            'IsApproved', v_table_id, 20, 1,
+            'N', 'N', 'Y', 'Y', 'N',
+            'Approved', 'Indicates if this document requires approval',
+            351, 'U', 1
+        );
+        UPDATE AD_Sequence SET currentnext = v_next_id + 1
+        WHERE name = 'AD_Column';
+        v_next_id := v_next_id + 1;
+    END IF;
 
+    RAISE NOTICE 'Migration complete. Last used AD_Column_ID: %', v_next_id - 1;
 END $$;
 
 -- ============================================================
