@@ -1,12 +1,6 @@
 package tw.ninniku.booking.form;
 
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.List;
 import java.util.Properties;
 import java.util.logging.Logger;
 
@@ -15,13 +9,24 @@ import org.compiere.model.MWFActivity;
 import org.compiere.model.MWorkflow;
 import org.compiere.util.DB;
 import org.compiere.util.Env;
-import org.compiere.util.Msg;
 import org.compiere.util.Trx;
 
 import tw.ninniku.booking.model.MResourceAssignment;
-import tw.ninniku.timeline.Group;
 
+/**
+ * BookingService — handles save, update, delete and DocAction transitions
+ * for S_ResourceAssignment.
+ *
+ * DocAction flow:
+ *   createBooking()      → saves record with DocStatus=DR, then submitForApproval → IP
+ *   approveBooking()     → admin shortcut: DR/IP → AP  (no workflow)
+ *   rejectBooking()      → IP → DR  (workflow rejection path)
+ *   voidBooking()        → any → VO
+ *   processDocAction()   → generic dispatcher used by BookingVM
+ */
 public class BookingService {
+
+    private static final Logger log = Logger.getLogger(BookingService.class.getName());
 
     private final Properties ctx;
 
@@ -29,169 +34,339 @@ public class BookingService {
         this.ctx = ctx;
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // CREATE
+    // ─────────────────────────────────────────────────────────────────────
+
     /**
-     * Creates or updates a booking. For weekly bookings, creates one record per week
-     * until dto.weeklyEndDate (all-or-nothing: any failure rolls back all iterations).
+     * Persists a new booking and immediately submits it for approval.
      *
-     * @param dto       validated, parsed DTO
-     * @param isAdmin   result of BookingTimeline.isWritable() — true if role has write access
-     * @param currentUserId  Env.getContextAsInt(ctx, "#AD_User_ID")
-     * @return S_ResourceAssignment_ID of the saved (or first-created) record
-     * @throws BookingValidationException if the user lacks permission to edit an existing booking
-     * @throws AdempiereException on DB failure (transaction rolled back before throwing)
+     * @return saved MResourceAssignment (DocStatus = IP after workflow start)
+     * @throws BookingValidationException on overlap or invalid data
+     * @throws AdempiereException         on DB/workflow errors
      */
-    public int saveBooking(BookingDTO dto, boolean isAdmin, int currentUserId)
-            throws BookingValidationException, AdempiereException {
+    public MResourceAssignment createBooking(BookingDTO dto,
+            boolean adminUser, int creatorUserId)
+            throws BookingValidationException {
 
-        // Permission check for existing bookings
-        if (dto.bookingId > 0) {
-            MResourceAssignment existing = new MResourceAssignment(ctx, dto.bookingId, null);
-            if (!isAdmin && existing.getCreatedBy() != currentUserId) {
-                throw new BookingValidationException(Msg.getMsg(ctx, "BK_PermissionUpdate"));
-            }
-        }
+        validateDto(dto, true);
 
-        Trx trx = Trx.get(Trx.createTrxName(), true);
-        int savedId = 0;
+        String trxName = Trx.createTrxName("BK_CREATE");
+        Trx trx = Trx.get(trxName, true);
         try {
-            trx.start();
+            MResourceAssignment ra = new MResourceAssignment(ctx, 0, trxName);
+            populateFromDto(ra, dto);
+            ra.set_ValueOfColumn("CreatedBy", creatorUserId);
 
-            MResourceAssignment booking = new MResourceAssignment(ctx, dto.bookingId, trx.getTrxName());
-            booking.setName(dto.name);
-            booking.setDescription(dto.description);
-            booking.setS_Resource_ID(dto.sResourceId);
-            booking.setAssignDateFrom(dto.assignFrom);
-            booking.setAssignDateTo(dto.assignTo);
-            if (booking.getAD_Org_ID() == 0) {
-                booking.setAD_Org_ID(Env.getAD_Org_ID(ctx));
+            if (!ra.save()) {
+                throw new AdempiereException("Could not save booking record.");
             }
 
-            if (!booking.save(trx.getTrxName())) {
-                throw new AdempiereException(Msg.getMsg(ctx, "BK_TimeOverlap") + ": " + booking.getAssignDateFrom() + " - " + booking.getAssignDateTo());
-            }
-            savedId = booking.getS_ResourceAssignment_ID();
-
-            // Weekly recurrence — only for new bookings
-            if (dto.bookingId == 0 && dto.isWeekly && dto.weeklyEndDate != null) {
-                Calendar calFrom = Calendar.getInstance();
-                Calendar calTo = Calendar.getInstance();
-                Calendar calEnd = Calendar.getInstance();
-                calFrom.setTime(dto.assignFrom);
-                calFrom.add(Calendar.DAY_OF_MONTH, 7);
-                calTo.setTime(dto.assignTo);
-                calTo.add(Calendar.DAY_OF_MONTH, 7);
-                calEnd.setTime(dto.weeklyEndDate);
-
-                while (calFrom.before(calEnd)) {
-                    MResourceAssignment weekly = new MResourceAssignment(ctx, 0, trx.getTrxName());
-                    weekly.setName(dto.name);
-                    weekly.setDescription(dto.description);
-                    weekly.setS_Resource_ID(dto.sResourceId);
-                    weekly.setAssignDateFrom(new Timestamp(calFrom.getTimeInMillis()));
-                    weekly.setAssignDateTo(new Timestamp(calTo.getTimeInMillis()));
-                    if (weekly.getAD_Org_ID() == 0) {
-                        weekly.setAD_Org_ID(Env.getAD_Org_ID(ctx));
-                    }
-                    if (!weekly.save(trx.getTrxName())) {
-                        throw new AdempiereException(Msg.getMsg(ctx, "BK_TimeOverlap") + ": " + weekly.getAssignDateFrom() + " - " + weekly.getAssignDateTo());
-                    }
-                    calFrom.add(Calendar.DAY_OF_MONTH, 7);
-                    calTo.add(Calendar.DAY_OF_MONTH, 7);
-                }
-            }
+            // Submit for approval (triggers workflow if one is configured)
+            triggerDocAction(ra, MResourceAssignment.DOCACTION_Prepare, trxName, adminUser);
 
             trx.commit();
-            return savedId;
-        } catch (AdempiereException e) {
+            return ra;
+
+        } catch (BookingValidationException ex) {
             trx.rollback();
-            throw e;
-        } catch (Exception e) {
+            throw ex;
+        } catch (Exception ex) {
             trx.rollback();
-            throw new AdempiereException(Msg.getMsg(ctx, "BK_ErrorSaving") + ": " + e.getMessage(), e);
+            throw new AdempiereException("createBooking failed: " + ex.getMessage(), ex);
         } finally {
             trx.close();
         }
     }
 
+    // ─────────────────────────────────────────────────────────────────────
+    // UPDATE (edit dialog)
+    // ─────────────────────────────────────────────────────────────────────
+
     /**
-     * Updates only the time and resource of an existing booking (used by drag-drop / resize).
-     * Uses auto-commit — single-record update, no weekly recurrence.
+     * Updates an existing booking. If the booking was previously Approved it
+     * is moved back to Draft first, then re-submitted.
      *
-     * @throws BookingValidationException if user lacks permission
-     * @throws AdempiereException on DB failure
+     * @throws BookingValidationException on overlap / invalid data
      */
-    public void updateBookingTime(int bookingId, int resourceId, Timestamp start, Timestamp end,
-            boolean isAdmin, int currentUserId)
-            throws BookingValidationException, AdempiereException {
-        if (bookingId <= 0) return;
+    public MResourceAssignment updateBooking(BookingDTO dto,
+            boolean adminUser, int editorUserId)
+            throws BookingValidationException {
 
-        MResourceAssignment booking = new MResourceAssignment(ctx, bookingId, null);
-        if (!isAdmin && booking.getCreatedBy() != currentUserId) {
-            throw new BookingValidationException(Msg.getMsg(ctx, "BK_PermissionUpdate"));
+        if (dto.bookingId <= 0) {
+            throw new BookingValidationException("Cannot update: invalid booking ID.");
         }
-        booking.setAssignDateFrom(start);
-        booking.setAssignDateTo(end);
-        booking.setS_Resource_ID(resourceId);
-        if (!booking.save()) {
-            throw new AdempiereException(Msg.getMsg(ctx, "BK_TimeOverlapUpdate"));
-        }
-    }
+        validateDto(dto, false);
 
-    /**
-     * Deletes a booking if the user has permission.
-     *
-     * @throws BookingValidationException if user lacks permission
-     * @throws AdempiereException on DB failure
-     */
-    public void deleteBooking(int bookingId, boolean isAdmin, int currentUserId)
-            throws BookingValidationException, AdempiereException {
-        if (bookingId <= 0) return;
-        MResourceAssignment booking = new MResourceAssignment(ctx, bookingId, null);
-        if (!isAdmin && booking.getCreatedBy() != currentUserId) {
-            throw new BookingValidationException(Msg.getMsg(ctx, "BK_PermissionDelete"));
-        }
-        booking.delete(true);
-    }
-
-    /**
-     * Loads all active bookings where AssignDateFrom is within [start, end]
-     * for the given resource type.
-     * Returns empty list if none found.
-     * Throws AdempiereException (unchecked) on DB failure.
-     */
-    public List<MResourceAssignment> fetchBookings(int resourceTypeId, Timestamp start, Timestamp end) {
-        String whereSql = " AssignDateFrom >= ? AND AssignDateFrom <= ? "
-                + "and exists (select 1 from S_Resource where S_Resource_ID = "
-                + "S_ResourceAssignment.S_Resource_ID and S_ResourceType_ID = ?) ";
-        return new org.compiere.model.Query(ctx, MResourceAssignment.Table_Name, whereSql, null)
-                .setParameters(new Object[]{start, end, resourceTypeId})
-                .setOrderBy("S_Resource_ID")
-                .setOnlyActiveRecords(true)
-                .list();
-    }
-
-    /**
-     * Loads timeline groups (resources) for the given resource type.
-     * Returns empty list if none found.
-     * Throws AdempiereException (unchecked) on DB failure.
-     */
-    public List<Group> fetchGroups(int resourceTypeId) {
-        List<Group> list = new ArrayList<>();
-        String sql = "select * from s_resource where s_resourcetype_id = ?";
-        PreparedStatement pstmt = null;
-        ResultSet rs = null;
+        String trxName = Trx.createTrxName("BK_UPDATE");
+        Trx trx = Trx.get(trxName, true);
         try {
-            pstmt = DB.prepareStatement(sql, null);
-            pstmt.setInt(1, resourceTypeId);
-            rs = pstmt.executeQuery();
-            while (rs.next()) {
-                list.add(new Group(rs.getInt("s_resource_id"), rs.getString("name")));
+            MResourceAssignment ra = new MResourceAssignment(ctx, dto.bookingId, trxName);
+            if (ra.getS_ResourceAssignment_ID() == 0) {
+                throw new BookingValidationException("Booking #" + dto.bookingId + " not found.");
             }
-        } catch (SQLException ex) {
-            throw new AdempiereException(Msg.getMsg(ctx, "BK_FailedLoad"), ex);
+
+            // If approved, re-open before editing
+            if (MResourceAssignment.DOCSTATUS_Approved.equals(ra.getDocStatus())) {
+                if (!adminUser) {
+                    throw new BookingValidationException(
+                            "Only administrators can modify an approved booking.");
+                }
+                ra.reActivateIt();
+                ra.saveEx(trxName);
+            }
+
+            populateFromDto(ra, dto);
+
+            if (!ra.save()) {
+                throw new AdempiereException("Could not update booking record.");
+            }
+
+            // Re-submit for approval
+            triggerDocAction(ra, MResourceAssignment.DOCACTION_Prepare, trxName, adminUser);
+
+            trx.commit();
+            return ra;
+
+        } catch (BookingValidationException ex) {
+            trx.rollback();
+            throw ex;
+        } catch (Exception ex) {
+            trx.rollback();
+            throw new AdempiereException("updateBooking failed: " + ex.getMessage(), ex);
         } finally {
-            DB.close(rs, pstmt);
+            trx.close();
         }
-        return list;
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // DRAG-DROP / RESIZE update (timeline only)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Updates booking time from timeline drag-drop.
+     * Admins bypass approval; regular users re-submit.
+     */
+    public void updateBookingTime(int bookingId, int resourceId,
+            Timestamp start, Timestamp end,
+            boolean adminUser, int editorUserId)
+            throws BookingValidationException {
+
+        if (bookingId <= 0) throw new BookingValidationException("Invalid booking ID.");
+        if (start == null || end == null || !end.after(start)) {
+            throw new BookingValidationException("Invalid time range.");
+        }
+
+        String trxName = Trx.createTrxName("BK_DRAG");
+        Trx trx = Trx.get(trxName, true);
+        try {
+            MResourceAssignment ra = new MResourceAssignment(ctx, bookingId, trxName);
+            if (ra.getS_ResourceAssignment_ID() == 0) {
+                throw new BookingValidationException("Booking #" + bookingId + " not found.");
+            }
+
+            // Only admin can move an approved booking
+            if (MResourceAssignment.DOCSTATUS_Approved.equals(ra.getDocStatus()) && !adminUser) {
+                throw new BookingValidationException(
+                        "Cannot move an approved booking without admin rights.");
+            }
+
+            if (resourceId > 0) ra.setS_Resource_ID(resourceId);
+            ra.setAssignDateFrom(start);
+            ra.setAssignDateTo(end);
+
+            if (!ra.save()) {
+                throw new AdempiereException("Could not save drag-drop update.");
+            }
+
+            // Admin → direct approve; user → re-submit
+            if (adminUser) {
+                triggerDocAction(ra, MResourceAssignment.DOCACTION_Approve, trxName, true);
+            } else {
+                triggerDocAction(ra, MResourceAssignment.DOCACTION_Prepare, trxName, false);
+            }
+
+            trx.commit();
+
+        } catch (BookingValidationException ex) {
+            trx.rollback();
+            throw ex;
+        } catch (Exception ex) {
+            trx.rollback();
+            throw new AdempiereException("updateBookingTime failed: " + ex.getMessage(), ex);
+        } finally {
+            trx.close();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // DELETE / VOID
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Voids (soft-delete) a booking via DocAction.
+     * Hard-delete is avoided because approved bookings need an audit trail.
+     */
+    public void deleteBooking(int bookingId, boolean adminUser, int userId)
+            throws BookingValidationException {
+
+        if (bookingId <= 0) throw new BookingValidationException("Invalid booking ID.");
+
+        String trxName = Trx.createTrxName("BK_VOID");
+        Trx trx = Trx.get(trxName, true);
+        try {
+            MResourceAssignment ra = new MResourceAssignment(ctx, bookingId, trxName);
+            if (ra.getS_ResourceAssignment_ID() == 0) {
+                throw new BookingValidationException("Booking #" + bookingId + " not found.");
+            }
+
+            if (MResourceAssignment.DOCSTATUS_Approved.equals(ra.getDocStatus()) && !adminUser) {
+                throw new BookingValidationException(
+                        "Only administrators can void an approved booking.");
+            }
+
+            triggerDocAction(ra, MResourceAssignment.DOCACTION_Void, trxName, adminUser);
+            trx.commit();
+
+        } catch (BookingValidationException ex) {
+            trx.rollback();
+            throw ex;
+        } catch (Exception ex) {
+            trx.rollback();
+            throw new AdempiereException("deleteBooking failed: " + ex.getMessage(), ex);
+        } finally {
+            trx.close();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // GENERIC DocAction dispatcher (called from BookingVM)
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Generic entry point: apply any DocAction to a booking.
+     * Supported actions: PR (prepare/submit), AP (approve), VO (void).
+     *
+     * @param bookingId  S_ResourceAssignment_ID
+     * @param docAction  one of MResourceAssignment.DOCACTION_* constants
+     */
+    public MResourceAssignment processDocAction(int bookingId, String docAction,
+            boolean adminUser) throws BookingValidationException {
+
+        if (bookingId <= 0) throw new BookingValidationException("Invalid booking ID.");
+
+        String trxName = Trx.createTrxName("BK_DOC");
+        Trx trx = Trx.get(trxName, true);
+        try {
+            MResourceAssignment ra = new MResourceAssignment(ctx, bookingId, trxName);
+            if (ra.getS_ResourceAssignment_ID() == 0) {
+                throw new BookingValidationException("Booking #" + bookingId + " not found.");
+            }
+
+            // Guard: non-admins cannot directly approve
+            if (MResourceAssignment.DOCACTION_Approve.equals(docAction) && !adminUser) {
+                throw new BookingValidationException("Insufficient privileges to approve bookings.");
+            }
+
+            triggerDocAction(ra, docAction, trxName, adminUser);
+            trx.commit();
+            return ra;
+
+        } catch (BookingValidationException ex) {
+            trx.rollback();
+            throw ex;
+        } catch (Exception ex) {
+            trx.rollback();
+            throw new AdempiereException("processDocAction failed: " + ex.getMessage(), ex);
+        } finally {
+            trx.close();
+        }
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Internal: execute DocAction + optional workflow
+    // ─────────────────────────────────────────────────────────────────────
+
+    /**
+     * Executes a DocAction on the model object.
+     * If a Workflow is defined for the S_ResourceAssignment table AND the action
+     * is "Prepare", the workflow is started instead of calling processIt directly.
+     * Otherwise processIt() is called and the record is saved.
+     */
+    private void triggerDocAction(MResourceAssignment ra, String action,
+            String trxName, boolean adminUser) throws Exception {
+
+        ra.setDocAction(action);
+
+        // Try to find a workflow attached to the S_ResourceAssignment table
+        int wfId = findWorkflowForTable(trxName);
+
+        if (wfId > 0 && MResourceAssignment.DOCACTION_Prepare.equals(action)) {
+            // Start the iDempiere workflow — it will call approve/reject via WF activities
+            MWorkflow wf = new MWorkflow(ctx, wfId, trxName);
+            wf.start(ra, Env.getContextAsInt(ctx, "#AD_User_ID"));
+            log.info("Workflow " + wfId + " started for booking " + ra.getS_ResourceAssignment_ID());
+
+        } else {
+            // Direct processIt (admin approve / void / no workflow configured)
+            if (!ra.processIt(action)) {
+                String msg = ra.getProcessMsg();
+                throw new BookingValidationException(
+                        msg != null ? msg : "DocAction '" + action + "' failed.");
+            }
+            ra.saveEx(trxName);
+        }
+    }
+
+    /**
+     * Looks for a Document Workflow (AD_Workflow) that is set as the
+     * "Document Value Workflow" for the S_ResourceAssignment table.
+     * Returns 0 if none found.
+     */
+    private int findWorkflowForTable(String trxName) {
+        // AD_Table.AD_Workflow_ID is the standard column for document workflows in iDempiere
+        String sql =
+            "SELECT COALESCE(w.AD_Workflow_ID, 0) "
+            + "FROM AD_Table t "
+            + "LEFT JOIN AD_Workflow w ON w.AD_Table_ID = t.AD_Table_ID "
+            + "    AND w.IsActive = 'Y' "
+            + "    AND w.WorkflowType = 'D' "   // D = Document Process
+            + "WHERE t.TableName = 'S_ResourceAssignment' "
+            + "  AND t.IsActive = 'Y' "
+            + "FETCH FIRST 1 ROWS ONLY";
+        return DB.getSQLValue(trxName, sql);
+    }
+
+    // ─────────────────────────────────────────────────────────────────────
+    // Helpers
+    // ─────────────────────────────────────────────────────────────────────
+
+    private void populateFromDto(MResourceAssignment ra, BookingDTO dto) {
+        ra.setS_Resource_ID(dto.sResourceId > 0 ? dto.sResourceId : dto.groupResourceId);
+        ra.setName(dto.name);
+        ra.setDescription(dto.description);
+        ra.setAssignDateFrom(dto.assignFrom != null ? dto.assignFrom : dto.startTime);
+        ra.setAssignDateTo(dto.assignTo != null ? dto.assignTo : dto.endTime);
+        ra.setQty(java.math.BigDecimal.ONE);
+        ra.setIsConfirmed(false);
+    }
+
+    private void validateDto(BookingDTO dto, boolean requireNewId)
+            throws BookingValidationException {
+        if (requireNewId && dto.bookingId != 0) {
+            throw new BookingValidationException("Expected bookingId=0 for new records.");
+        }
+        if (dto.sResourceId <= 0 && dto.groupResourceId <= 0) {
+            throw new BookingValidationException("Resource is required.");
+        }
+        if (dto.name == null || dto.name.trim().isEmpty()) {
+            throw new BookingValidationException("Booking name is required.");
+        }
+        if (dto.assignFrom == null || dto.assignTo == null) {
+            throw new BookingValidationException("Start and end times are required.");
+        }
+        if (!dto.assignTo.after(dto.assignFrom)) {
+            throw new BookingValidationException("End time must be after start time.");
+        }
     }
 }
