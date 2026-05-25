@@ -34,6 +34,7 @@ Import-Package: com.google.gson,
  org.zkoss.zul;version="[9.6.0,10.0.0]"
 Service-Component: OSGI-INF/tw.ninniku.booking.model.factory.xml,
  OSGI-INF/tw.ninniku.booking.form.factory.xml,
- OSGI-INF/tw.ninniku.booking.process.factory.xml
+ OSGI-INF/tw.ninniku.booking.process.factory.xml,
+ OSGI-INF/MResourceAssignmentFactory.xml
 Bundle-ClassPath: .,
  src/
